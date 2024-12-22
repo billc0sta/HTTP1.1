@@ -1,7 +1,7 @@
 #include "client_info.h"
 #include "includes.h"
 
-struct client_group make_clients() {
+struct client_group make_client_group() {
 	struct client_group clients;
 	clients.cap = 0;
 	clients.len = 0;

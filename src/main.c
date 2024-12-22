@@ -1,9 +1,9 @@
-#include "client_info.h"
 #include "includes.h"
+#include "client_info.h"
+#include "request_info.h"
+#include "request_parser.h"
 #include <WinSock2.h>
 #include <ws2tcpip.h>
-
-int parse(struct client_info*); 
 
 int main() {
 	WSADATA data;
@@ -34,10 +34,16 @@ int main() {
 		fprintf(stderr, "[main] listen() failed - %d.\n", WSAGetLastError());
 		exit(1);
 	}
-	struct client_group clients = make_clients();
+	if (request_info_init() != 0) {
+		fprintf(stderr, "[main] request_info_init failed.\n");
+		exit(1); 
+	}
+	request_parser_init();
+	struct client_group clients = make_client_group();
 	while (1) {
 		fd_set read;
-		if (ready_clients(&clients, server, &read) == 1) {
+		if (ready_clients(&clients, server, &read) != 0) {
+			fprintf(stderr, "[main] ready_clients() failed.\n");
 			exit(1);
 		}
 
@@ -68,86 +74,14 @@ int main() {
 				else {
 					client->bufflen += res;
 					client->buffer[client->bufflen] = 0;
-					parse(&client);
+					parse_request(&client);
 				}
 			}
 		}
 	}
 
-	free_clients(&clients);
+	request_parser_end(); 
+	free_clients_group(&clients);
 	WSACleanup();
-	return 0;
-} 
-
-int parse(struct client_info* client) {
-	struct request_info* req = &client->request;
-	int len = 0;
-	char* q     = client->buffer;
-	char* start = q;
-	char* end   = q + client->bufflen - 1;
-
-	while (q <= end && strstr(q, "\r\n")) {
-		if (req->method == METHOD_NONE) {
-
-			q = strchr(q, ' ');
-			if (!q)
-				return 1;
-			*q = 0;
-			if (strcmp(start, "GET") == 0)
-				req->method = METHOD_GET;
-			else if (strcmp(start, "HEAD") == 0)
-				req->method = METHOD_HEAD;
-			else if (strcmp(start, "POST") == 0)
-				req->method = METHOD_POST;
-			else
-				return 1;
-
-			++q;
-			start = q;
-			if (q > end)
-				return 1;
-			if (*start != '/')
-				return 1;
-			q = strchr(q, ' ');
-			if (!q)
-				return 1;
-			*q = 0;
-			if ((len = strlen(start)) > RESOURCE_BUFFLEN)
-				return 1;
-			if (strstr(start, ".."))
-				return 1;
-			memcpy(req->resource, start, len);
-
-			++q;
-			start = q;
-			if (q > end)
-				return 1;
-			q = strchr(q, ' ');
-			if (!q)
-				return 1;
-			*q = 0;
-			if (strcmp(start, "HTTP/1.0") == 0)
-				req->version = HTTP_VERSION_1;
-			else if (strcmp(start, "HTTP/1.1") == 0)
-				req->version = HTTP_VERSION_1_1;
-			else
-				return 1;
-
-			++q;
-			if (q > end - 2)
-				return 1;
-			if (memcmp(q, "\r\n", 2) != 0)
-				return 1;
-			q += 2;
-		}
-
-		else {
-			q = strchr(q, ':');
-			if (!q)
-				return 0;
-			*q = 0;
-			
-		}
-	}
 	return 0;
 }

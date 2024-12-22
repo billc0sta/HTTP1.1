@@ -1,4 +1,9 @@
+#ifndef REQUEST_INFO_H_
+#define REQUEST_INFO_H_
+
+#include "includes.h"
 #define RESOURCE_BUFFLEN 255
+#define BODY_BUFFLEN (1024 * 1024 * 2)
 
 enum { 
 	METHOD_GET,
@@ -8,20 +13,99 @@ enum {
 };
 
 enum {
-	HDR_AIM,
+	CONNECTION_KEEP_ALIVE,
+	CONNECTION_CLOSE
+};
+
+enum {
+	MEDIA_ACC,
+	MEDIA_ABW,
+	MEDIA_APNG,
+	MEDIA_ARC,
+	MEDIA_AVIF,
+	MEDIA_AVI,
+	MEDIA_AZW,
+	MEDIA_OCTET_STREAM,
+	MEDIA_BMP,
+	MEDIA_BZIP,
+	MEDIA_BZIP2, 
+	MEDIA_X_CDF,
+	MEDIA_X_CSH,
+	MEDIA_CSS,
+	MEDIA_CSV,
+	MEDIA_DOC,
+	MEDIA_DOCX,
+	MEDIA_EOT,
+	MEDIA_EPUB,
+	MEDIA_GZ,
+	MEDIA_HTML,
+	MEDIA_ICO,
+	MEDIA_JPEG,
+	MEDIA_JS,
+	MEDIA_MIDI,
+	MEDIA_MJS,
+	MEDIA_MP3,
+	MEDIA_MP4,
+	MEDIA_MPEG,
+	MEDIA_MPKG,
+	MEDIA_ODP,
+	MEDIA_ODS,
+	MEDIA_ODT,
+	MEDIA_OGA,
+	MEDIA_OGV,
+	MEDIA_OGX,
+	MEDIA_OPUS,
+	MEDIA_OTF,
+	MEDIA_PNG,
+	MEDIA_PDF,
+	MEDIA_PHP,
+	MEDIA_PPT,
+	MEDIA_PPTX,
+	MEDIA_RAR,
+	MEDIA_RTF,
+	MEDIA_SH,
+	MEDIA_SVG,
+	MEDIA_TAR,
+	MEDIA_TIFF,
+	MEDIA_TS,
+	MEDIA_TTF,
+	MEDIA_TXT,
+	MEDIA_VSD,
+	MEDIA_WAV,
+	MEDIA_WEBA,
+	MEDIA_WEBM,
+	MEDIA_WEBP,
+	MEDIA_WOFF,
+	MEDIA_WOFF2,
+	MEDIA_XHTML,
+	MEDIA_XLS,
+	MEDIA_XLSX,
+	MEDIA_XML,
+	MEDIA_XUL,
+	MEDIA_ZIP,
+	MEDIA_3GP,
+	MEDIA_3G2,
+	MEDIA_7Z
+};
+
+enum {
+	EXPECT_CONTINUE
+};
+
+enum {
+	HDR_A_IM,
 	HDR_ACCEPT,
 	HDR_ACCEPT_CHARSET,
-	HDR_ACCEPT_DATATIME,
+	HDR_ACCEPT_DATETIME,
 	HDR_ACCEPT_ENCODING,
 	HDR_ACCEPT_LANGUAGE,
 	HDR_ACCESS_CONTROL_REQUEST_METHOD,
-	HDR_ACCESS_CONTROL_REQUEST_HEADER,
+	HDR_ACCESS_CONTROL_REQUEST_HEADERS,
 	HDR_AUTHORIZATION,
 	HDR_CACHE_CONTROL,
 	HDR_CONNECTION,
 	HDR_CONTENT_ENCODING,
 	HDR_CONTENT_LENGTH,
-	HDR_CONTENT_MD5,
 	HDR_CONTENT_TYPE,
 	HDR_COOKIE,
 	HDR_DATE,
@@ -29,13 +113,14 @@ enum {
 	HDR_FORWARDED,
 	HDR_FROM,
 	HDR_HOST,
-	HDR_HTTP2_SETTINGS,
 	HDR_IF_MATCH,
 	HDR_IF_MODIFIED_SINCE,
+	HDR_IF_NONE_MATCH,
 	HDR_IF_RANGE,
 	HDR_IF_UNMODIFIED_SINCE,
 	HDR_MAX_FORWARDS,
 	HDR_ORIGIN,
+	HDR_PRAGMA,
 	HDR_PREFER,
 	HDR_PROXY_AUTHORIZATION,
 	HDR_RANGE,
@@ -46,60 +131,21 @@ enum {
 	HDR_USER_AGENT,
 	HDR_UPGRADE,
 	HDR_VIA,
-	HDR_WARNING,
-	HDR_NONE
-};
-
-struct host_info { 
-	ipv4_t ip;
-	uint16_t port; 
-};
-
-struct header_field {
-	char* name;
-	struct header_value* value;
-};
-
-enum {
-	HDRV_TEXT,
-	HDRV_NUMBER,
-	HDRV_BOOLEAN,
-	HDRV_SPECIFIER,
-	HDRV_DATE,
-	HDRV_FIELD,
-	HDRV_HOST,
-	HDRV_LIST
-};
-
-struct header_value {
-	int type;
-	union {
-		char* text;
-		long   number;
-		char   boolean;
-		int    specifier;
-		time_t date;
-		struct header_field field;
-		struct host_info host;
-		struct header* list;
-	} v;
-};
-
-struct header {
-	int type;
-	struct header_value value;
+	HDR_NOT_SUPPORTED
 };
 
 struct request_info {
 	char method;
 	char version;
-	char* resource;
 	char finished;
-	struct header* headers;
-	int headers_len; 
-	int headers_cap;
+	char* resource;
+	struct value* headers[HDR_NOT_SUPPORTED];
+	char body[BODY_BUFFLEN + 1];
+	int body_len; 
 };
 
-int make_request_info(struct request_info* req);
-int free_request_info(struct request_info* req);
-int reset_request_info(struct request_info* req);
+int make_request_info(struct request_info*);
+int free_request_info(struct request_info*);
+int reset_request_info(struct request_info*);
+int add_value_request_info(struct request_info*, struct value*, int);
+#endif

@@ -1,5 +1,6 @@
 #include "request_info.h"
 #include "includes.h"
+#include "value.h"
 
 int make_request_info(struct request_info* req) {
 	if (!req) {
@@ -15,45 +16,50 @@ int make_request_info(struct request_info* req) {
 	}
 	req->resource[RESOURCE_BUFFLEN] = 0;
 	req->version = HTTP_VERSION_NONE;
-	req->headers = NULL;
-	req->headers_cap = 0;
-	req->headers_len = 0;
+	req->body[BODY_BUFFLEN] = 0;
+	memset(req->headers, 0, sizeof(req->headers));
 	return 0;
 }
 
 int free_request_info(struct request_info* req) {
 	if (!req) {
-		fprintf(stderr, "[free_request_info] passed NULL pointers for mandatory parameters\n");
+		fprintf(stderr, "[free_request_info] passed NULL pointers for mandatory parameters.\n");
 		return 1; 
 	}
+	for (int i = 0; i < HDR_NOT_SUPPORTED; ++i) {
+		struct value* prev = NULL;
+		struct value* curr = req->headers[i];
+		while (curr) {
+			prev = curr;
+			curr = curr->next;
+			free_header_value(prev);
+		}
+	}
 	free(req->resource);
+	return 0; 
 }
 
 int reset_request_info(struct request_info* req) {
-	req->method  = METHOD_NONE;
-	req->version = HTTP_VERSION_NONE;
-	req->headers_len = 0;
+	if (!req) {
+		fprintf(stderr, "[reset_request_info] passed NULL pointers for mandatory parameters.\n");
+		return 1;
+	} 
+	req->method   = METHOD_NONE;
+	req->version  = HTTP_VERSION_NONE;
+	req->body_len = 0;
 	return 0;
 }
 
-int add_header(struct request_info* req, struct header hdr) {
+int add_value_request_info(struct request_info* req, struct value* val, int type) {
 	if (!req) {
-		fprintf(stderr, "[add_header] passed NULL pointers for mandatory parameters.\n");
+		fprintf(stderr, "[add_header_value] passed NULL pointers for mandatory parameters.\n");
 		return 1;
 	}
-
-	if (req->headers_len == req->headers_cap) {
-		size_t new_cap = MAX(0, req->headers_cap * 2);
-		struct header* new_data = realloc(req->headers, new_cap * sizeof(struct header));
-		if (!new_data) {
-			fprintf(stderr, "[add_header] failed to allocate memory.\n");
-			return 1;
-		}
-		req->headers = new_data;
-		req->headers_cap = new_cap;
+	if (!req->headers[type]) 
+		req->headers[type] = val;
+	else {
+		val->next = req->headers[type];
+		req->headers[type] = val;
 	}
-
-	req->headers[req->headers_len] = hdr;
-	++req->headers_len;
-	return 0; 
+	return 0;
 }
