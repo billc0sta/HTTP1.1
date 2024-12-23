@@ -26,7 +26,7 @@ int main() {
 		exit(1);
 	}
 	if (bind(server, binder->ai_addr, binder->ai_addrlen) != 0) {
-		fprint(stderr, "[main] bind() failed - %d.\n", WSAGetLastError());
+		fprintf(stderr, "[main] bind() failed - %d.\n", WSAGetLastError());
 		exit(1);
 	}
 	freeaddrinfo(binder);
@@ -35,7 +35,7 @@ int main() {
 		exit(1);
 	}
 	if (request_info_init() != 0) {
-		fprintf(stderr, "[main] request_info_init failed.\n");
+		fprintf(stderr, "[main] request_info_init() failed.\n");
 		exit(1); 
 	}
 	request_parser_init();

@@ -4,25 +4,130 @@
 #include "request_info.h"
 #include "value.h"
 
-static hashmap* _supported_headers;
-static hashmap* _supported_media; 
+hashmap* _supported_headers;
+hashmap* _supported_media; 
+hashmap* _supported_languages;
 static char* _lowered_string;
 typedef struct value*(*value_parser) (char*, int);
 value_parser parsers[HDR_NOT_SUPPORTED];
 
 struct value* parse_text(char*, int);
 struct value* parse_number(char*, int);
-struct value* parse_specifier(char*, int);
+struct value* parse_directive(char*, int);
 struct value* parse_date(char*, int);
-struct value* parse_field(char*, int);
 struct value* parse_host(char*, int);
 struct value* parse_list(char*, int);
 struct value* parse_options(char*, int);
-static int insensitive_string_cmp(const char*, const char*);
+int insensitive_string_cmp(const char*, const char*);
+
+/*	
+	TODO: 
+	parse_pair() to be more value-specific
+	parse_directive() to include parameter 
+	parse Cache-Control 
+	specialize for Forwarded header
+*/
+static int validate_token(char* str) {
+	while (*str) {
+		char chr = *str++;
+		if (!(
+			chr >= 'A' && chr <= 'Z' ||
+			chr >= 'a' && chr <= 'z' ||
+			chr >= '0' && chr <= '9' ||
+			chr == '-' || chr == '_'
+			))
+			return 0;
+	}
+	return 1;
+} 
+
+static struct value* parse_pair(char* str, int type) {
+	char* q, *begin;
+	begin = q = str;
+	q = strchr(q, '=');
+	if (!q)
+		return NULL;
+	*q++ = 0;
+	if (!validate_token(begin))
+		return NULL;
+	struct value* val;
+	if (isdigit(*q))
+		val = parse_number(q, type);
+	else
+		val = parse_text(q, type);
+	if (!val)
+		return NULL;
+	struct value* v = make_pair_value(begin, val);
+	if (!v)
+		free_values(val);
+	return v;
+}
+
+static struct value* parse_options(char* str, int type) {
+	switch (type) {
+	case HDR_A_IM: 
+	case HDR_ACCEPT:
+	case HDR_ACCEPT_CHARSET: 
+	case HDR_ACCEPT_ENCODING:
+	case HDR_ACCEPT_LANGUAGE:
+	case HDR_ACCESS_CONTROL_REQUEST_HEADERS: 
+	case HDR_ACCESS_CONTROL_REQUEST_METHOD: {
+		return parse_directive(str, type);
+	} break;
+	case HDR_COOKIE: {
+		return parse_pair(str, type);
+	} break;
+	}
+}
+
+static struct value* parse_list(char* str, int type) {
+	struct value* ls = NULL, *prev; 
+	char *q, *begin;
+	char* sep = (type == HDR_ACCESS_CONTROL_REQUEST_HEADERS ? "," : ", ");
+	q = str;
+	ls = parse_options(str, type); 
+	if (!ls)
+		return NULL;
+	do {
+		begin = q;
+		q = strstr(q, ", ");
+		if (q) {
+			*q = 0;
+			q += 2; 
+		}
+		prev = ls;
+		ls = parse_options(str, type);
+		if (!ls) {
+			free_values(prev);
+			return NULL;
+		}
+		ls->next = prev;
+	} while (q);
+	return ls;
+}
+
+static struct value* parse_host(char* str, int type) {
+	char* q, *begin;
+	int len;
+	int port = 80;
+	begin = q = str;
+	q = strchr(q, ':');
+	if (q) 
+		*q++ = 0;
+	len = strlen(begin);
+	if (len < DOMAIN_MINLEN || len > DOMAIN_MAXLEN)
+		return NULL;
+	if (q) {
+		port = atoi(q);
+		if (port < 1 || port > 65535)
+			return NULL;
+	}
+	return make_host_value(begin, port);
+}
 
 static struct value* parse_date(char* str, int type) {
 	struct vdate date;
-	if (strlen(str) < 29)
+	if (strlen(str) != 29)
 		return NULL;
 
 	char* begin = str;
@@ -149,7 +254,7 @@ static struct value* parse_date(char* str, int type) {
 	return make_date_value(&date);
 }
 
-static struct value* parse_specifier(char* str, int type) {
+static struct value* parse_directive(char* str, int type) {
 	int spec = -1;
 	switch (type) {
 	case HDR_ACCESS_CONTROL_REQUEST_METHOD: {
@@ -180,20 +285,71 @@ static struct value* parse_specifier(char* str, int type) {
 	} break;
 
 	case HDR_EXPECT: {
-		if (insensitive_string_cmp(str, "100-continue"))
+		if (insensitive_string_cmp(str, "100-continue") == 0)
 			spec = EXPECT_CONTINUE;
 		else
 			return NULL;
-	}
+	} break;
+	case HDR_ACCEPT_CHARSET: {
+		if (insensitive_string_cmp(str, "UTF-8") == 0)
+			spec = CHARSET_UTF_8;
+		else if (insensitive_string_cmp(str, "ISO-8859-1") == 0)
+			spec = CHARSET_ISO_8859_1;
+		else if (insensitive_string_cmp(str, "ISO-8859-2") == 0)
+			spec = CHARSET_ISO_8859_2;
+		else if (insensitive_string_cmp(str, "Windows-1252") == 0)
+			spec = CHARSET_WINDOWS_1252;
+		else if (insensitive_string_cmp(str, "Shift_JIS") == 0)
+			spec = CHARSET_SHIFT_JIS;
+		else if (insensitive_string_cmp(str, "EUC-JP") == 0)
+			spec = CHARSET_EUC_JP;
+		else if (insensitive_string_cmp(str, "GB2312") == 0)
+			spec = CHARSET_GB2312;
+		else if (insensitive_string_cmp(str, "Big5") == 0)
+			spec = CHARSET_BIG5;
+		else if (insensitive_string_cmp(str, "ISO-8859-9") == 0)
+			spec = CHARSET_ISO_8859_9;
+		else if (insensitive_string_cmp(str, "ISO-2022-JP") == 0)
+			spec = CHARSET_ISO_2022_JP;
+		else
+			return NULL;
+	} break;
+	case HDR_CONTENT_ENCODING:
+	case HDR_ACCEPT_ENCODING: {
+		if (insensitive_string_cmp(str, "gzip") == 0)
+			spec = ENCODING_GZIP;
+		else if (insensitive_string_cmp(str, "compress") == 0)
+			spec = ENCODING_COMPRESS;
+		else if (insensitive_string_cmp(str, "deflate") == 0)
+			spec = ENCODING_DEFLATE;
+		else if (insensitive_string_cmp(str, "br") == 0)
+			spec = ENCODING_BR;
+		else if (insensitive_string_cmp(str, "zstd") == 0)
+			spec = ENCODING_ZSTD;
+		else
+			return NULL;
+	} break;
+	case HDR_ACCEPT_LANGUAGE: {
+		int* v = hashmap_get(_supported_languages, str);
+		if (!v)
+			return NULL;
+		spec = *v;
+	} break;
+	case HDR_ACCESS_CONTROL_REQUEST_HEADERS: {
+		int* v = hashmap_get(_supported_headers, str);
+		if (!v)
+			return NULL;
+		spec = *v;
+	} break;
 	}
 	if (spec == -1)
 		return NULL;
-	return make_number_value(spec);
+	return make_directive_value(spec);
 }
 
 static struct value* parse_number(char* str, int type) {
-	long n = strtol(str, NULL, 10);
-	if (n == 0L)
+	long n = strtold(str, NULL, 10);
+	if (n == 0)
 		return NULL;
 	return make_number_value(n);
 }
@@ -231,6 +387,7 @@ static int insensitive_string_cmp(const char* str1, const char* str2) {
 
 int request_parser_end(void) {
 	hashmap_free(_supported_headers);
+	hashmap_free(_supported_media);
 	free(_lowered_string);
 	return 0;
 }
@@ -251,6 +408,14 @@ int request_parser_init(void) {
 	if (!_supported_media) {
 		free(_lowered_string);
 		hashmap_free(_supported_headers);
+		fprintf(stderr, "[request_info_init] hashmap_new() failed - %s.\n", hashmap_error());
+		return 1;
+	}
+	_supported_languages = hashmap_new(sizeof(char*), sizeof(int), 0, hash_string, insensitive_string_cmp, NULL, NULL);
+	if (!_supported_languages) {
+		free(_lowered_string);
+		hashmap_free(_supported_headers);
+		hashmap_free(_supported_media);
 		fprintf(stderr, "[request_info_init] hashmap_new() failed - %s.\n", hashmap_error());
 		return 1;
 	}
@@ -296,8 +461,7 @@ int request_parser_init(void) {
 	hashmap_set(_supported_headers, &"Upgrade", &(int){HDR_UPGRADE});
 	hashmap_set(_supported_headers, &"Via", &(int){HDR_VIA});
 
-
-	hashmap_resize(_supported_headers, 200);
+	hashmap_resize(_supported_media, 200);
 	hashmap_set(_supported_media, &"audio/aac", &(int){MEDIA_ACC});
 	hashmap_set(_supported_media, &"application/x-abiword", &(int){MEDIA_ABW});
 	hashmap_set(_supported_media, &"image/apng", &(int){MEDIA_APNG});
@@ -367,6 +531,32 @@ int request_parser_init(void) {
 	hashmap_set(_supported_media, &"video/3gpp2", &(int){MEDIA_3G2});
 	hashmap_set(_supported_media, &"application/x-7z-compressed", &(int){MEDIA_7Z});
 
+	hashmap_resize(_supported_languages, 50);
+	hashmap_set(_supported_languages, &"en-US", &(int){LANG_EN_US});
+	hashmap_set(_supported_languages, &"en-GB", &(int){LANG_EN_GB});
+	hashmap_set(_supported_languages, &"fr", &(int){LANG_FR});
+	hashmap_set(_supported_languages, &"fr-FR", &(int){LANG_FR_FR});
+	hashmap_set(_supported_languages, &"de", &(int){LANG_DE});
+	hashmap_set(_supported_languages, &"de-DE", &(int){LANG_DE_DE});
+	hashmap_set(_supported_languages, &"es", &(int){LANG_ES});
+	hashmap_set(_supported_languages, &"es-ES", &(int){LANG_ES_ES});
+	hashmap_set(_supported_languages, &"it", &(int){LANG_IT});
+	hashmap_set(_supported_languages, &"it-IT", &(int){LANG_IT_IT});
+	hashmap_set(_supported_languages, &"pt", &(int){LANG_PT});
+	hashmap_set(_supported_languages, &"pt-BR", &(int){LANG_PT_BR});
+	hashmap_set(_supported_languages, &"zh", &(int){LANG_ZH});
+	hashmap_set(_supported_languages, &"zh-CN", &(int){LANG_ZH_CN});
+	hashmap_set(_supported_languages, &"zh-TW", &(int){LANG_ZH_TW});
+	hashmap_set(_supported_languages, &"ja", &(int){LANG_JA});
+	hashmap_set(_supported_languages, &"ja-JP", &(int){LANG_JA_JP});
+	hashmap_set(_supported_languages, &"ko", &(int){LANG_KO});
+	hashmap_set(_supported_languages, &"ko-KR", &(int){LANG_KO_KR});
+	hashmap_set(_supported_languages, &"ru", &(int){LANG_RU});
+	hashmap_set(_supported_languages, &"ru-RU", &(int){LANG_RU_RU});
+	hashmap_set(_supported_languages, &"ar", &(int){LANG_AR});
+	hashmap_set(_supported_languages, &"ar-SA", &(int){LANG_AR_SA});
+	hashmap_set(_supported_languages, &"nl", &(int){LANG_NL});
+	hashmap_set(_supported_languages, &"nl-NL", &(int){LANG_NL_NL});
 
 	parsers[HDR_A_IM]                           = parse_list;
 	parsers[HDR_ACCEPT]                         = parse_list;
@@ -375,16 +565,16 @@ int request_parser_init(void) {
 	parsers[HDR_ACCEPT_ENCODING]                = parse_list;
 	parsers[HDR_ACCEPT_LANGUAGE]                = parse_list;
 	parsers[HDR_ACCESS_CONTROL_REQUEST_HEADERS] = parse_list;
-	parsers[HDR_ACCESS_CONTROL_REQUEST_METHOD]  = parse_specifier;
+	parsers[HDR_ACCESS_CONTROL_REQUEST_METHOD]  = parse_list;
 	parsers[HDR_AUTHORIZATION]                  = parse_text;
 	parsers[HDR_CACHE_CONTROL]                  = parse_list;
-	parsers[HDR_CONNECTION]                     = parse_specifier;
+	parsers[HDR_CONNECTION]                     = parse_directive;  
 	parsers[HDR_CONTENT_ENCODING]               = parse_list;
 	parsers[HDR_CONTENT_LENGTH]                 = parse_number;
-	parsers[HDR_CONTENT_TYPE]                   = parse_specifier;
+	parsers[HDR_CONTENT_TYPE]                   = parse_directive; 
 	parsers[HDR_COOKIE]                         = parse_list;
 	parsers[HDR_DATE]                           = parse_date;
-	parsers[HDR_EXPECT]                         = parse_specifier;
+	parsers[HDR_EXPECT]                         = parse_directive; 
 	parsers[HDR_FORWARDED]                      = parse_list;
 	parsers[HDR_FROM]                           = parse_text;
 	parsers[HDR_HOST]                           = parse_host;
@@ -512,6 +702,7 @@ int parse_request(struct client_info* client) {
 		}
 	}
 	client->bufflen = MAX(0, client->bufflen - (q - client->buffer));
-	memcpy(client->buffer, q, client->bufflen);
+	if (client->bufflen > 0)
+		memcpy(client->buffer, q, client->bufflen);
 	return 0;
 }

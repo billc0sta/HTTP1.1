@@ -27,13 +27,7 @@ int free_request_info(struct request_info* req) {
 		return 1; 
 	}
 	for (int i = 0; i < HDR_NOT_SUPPORTED; ++i) {
-		struct value* prev = NULL;
-		struct value* curr = req->headers[i];
-		while (curr) {
-			prev = curr;
-			curr = curr->next;
-			free_header_value(prev);
-		}
+		free_values(req->headers[i]);
 	}
 	free(req->resource);
 	return 0; 
