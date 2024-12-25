@@ -22,7 +22,7 @@ struct client_group {
 	struct client_info* data;
 };
 
-int add_client(struct client_group*, SOCKET, struct sockaddr_in* s);
+struct client_info* add_client(struct client_group*, SOCKET, struct sockaddr_in* s);
 int drop_client(struct client_info*);
 struct client_group make_client_group();
 int free_clients_group(struct client_group*);

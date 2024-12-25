@@ -22,18 +22,19 @@ int reset_client_info(struct client_info* client) {
 	client->request.finished = 0;
 	client->request.method = METHOD_NONE;
 	client->request.version = HTTP_VERSION_NONE;
+	return 0;
 }
 
-int add_client(struct client_group* clients, SOCKET sockfd, struct sockaddr_in* addr) {
+struct client_info* add_client(struct client_group* clients, SOCKET sockfd, struct sockaddr_in* addr) {
 	if (!clients || !addr) {
 		fprintf(stderr, "[add_client] passed NULL pointers for mandatory parameters.\n");
-		return 1;
+		return NULL;
 	}
 
 	const size_t len = clients->len;
 	const size_t cap = clients->cap;
 	if (len < cap) {
-		const struct client_info* data = clients->data;
+		struct client_info* data = clients->data;
 		for (size_t i = 0; i < cap; ++i) {
 			if (data[i].used == 0) {
 				struct client_info* client = &data[i];
@@ -42,7 +43,7 @@ int add_client(struct client_group* clients, SOCKET sockfd, struct sockaddr_in* 
 				client->sockfd = sockfd;
 				client->used = 1;
 				++clients->len;
-				return 0;
+				return client;
 			}
 		}
 	}
@@ -52,7 +53,7 @@ int add_client(struct client_group* clients, SOCKET sockfd, struct sockaddr_in* 
 		struct client_info* new_data = calloc(new_cap, sizeof(struct client_info));
 		if (new_data == NULL) {
 			fprintf(stderr, "[add_client] realloc() failed.\n");
-			return 1;
+			return NULL;
 		}
 		struct client_info* old_data = clients->data;
 		size_t counter = 0;
@@ -62,16 +63,21 @@ int add_client(struct client_group* clients, SOCKET sockfd, struct sockaddr_in* 
 			}
 		}
 		free(old_data);
+		
 		clients->data = new_data;
 		clients->cap = new_cap;
 		struct client_info* client = &clients->data[counter++];
+		reset_client_info(client);
 		client->addr = *addr;
 		client->sockfd = sockfd;
 		client->used = 1;
 		clients->len = counter;
 
-		return 0;
+		return client;
 	}
+
+	// unreachable 
+	return NULL;
 }
 
 int drop_client(struct client_info* client) {
@@ -94,6 +100,7 @@ int free_client_info(struct client_info* client) {
 	}
 	reset_client_info(client);
 	free_request_info(&client->request);
+	return 0; 
 }
 
 int free_clients_group(struct client_group* clients) {
@@ -119,19 +126,20 @@ int ready_clients(struct client_group* clients, SOCKET server_sockfd, fd_set* re
   	}
   	const size_t cap = clients->cap;
  	const struct client_info* data = clients->data;
- 	FD_ZERO(&read);
- 	FD_SET(server_sockfd, &read); 
- 	int max_socket = server_sockfd;
+ 	FD_ZERO(read);
+ 	FD_SET(server_sockfd, read); 
+ 	int max_socket = (int)server_sockfd;
  	for (size_t i = 0; i < cap; ++i) {
 	 	if (data[i].used == 1) {
 	 		SOCKET sockfd = data[i].sockfd;
-	 		FD_SET(sockfd, &read);
-	 		if (sockfd > max_socket) max_socket = sockfd;
+	 		FD_SET(sockfd, read);
+	 		if (sockfd > max_socket) max_socket = (int)sockfd;
 		}
 	}
  	struct timeval timeout;
- 	timeout.tv_sec = SELECT_TIMEOUT;
- 	if (select(max_socket + 1, &read, NULL, NULL, &timeout) < 0) {
+ 	timeout.tv_sec = SELECT_SEC;
+	timeout.tv_usec = SELECT_USEC;
+ 	if (select(max_socket + 1, read, NULL, NULL, &timeout) < 0) {
 		fprintf(stderr, "[ready_clients] select() failed - %d.\n", WSAGetLastError());
 		return 1;
 	}
@@ -145,6 +153,6 @@ int print_client_address(struct client_info* client) {
 	}
 	static char address[100];
 	getnameinfo((struct sockaddr*)&client->addr, client->addrlen, address, 100, NULL, 0, NI_NUMERICHOST);
-	printf("the client's address: %s", address);
+	printf("the client's address: %s\n", address);
 	return 0;
 }

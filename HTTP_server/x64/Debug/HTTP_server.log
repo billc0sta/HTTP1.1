@@ -1,0 +1,5 @@
+﻿  client_info.c
+  main.c
+  request_info.c
+  Generating Code...
+  HTTP_server.vcxproj -> D:\Programming\HTTP_server\x64\Debug\HTTP_server.exe

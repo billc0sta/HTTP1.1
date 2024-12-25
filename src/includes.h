@@ -7,7 +7,8 @@
 #include <string.h>
 #include <ctype.h>
 #include "hashmap.h"
-#define SELECT_TIMEOUT 5
+#define SELECT_SEC 5
+#define SELECT_USEC 0
 #define HTTP_VERSION_1 0
 #define HTTP_VERSION_1_1 1
 #define HTTP_VERSION_NONE 2
