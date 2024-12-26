@@ -15,6 +15,19 @@
 
 #include "includes.h"
 #include "client_info.h"
+#include "request_parser.h"
+
+static int dump_headers(headers* headers) {
+	size_t iter = 0;
+	struct value* values;
+	char* name;
+	while (next_header(headers, &iter, &name, &values) == 0) {
+		for (struct value* curr = values; curr; curr = curr->next) {
+			printf("-- {%s:%s}\n", name, curr->v);
+		}
+	}
+	return 0;
+}
 
 int main() {
 #ifdef _WIN32
@@ -77,14 +90,19 @@ int main() {
 		for (size_t i = 0; i < cap; ++i) {
 			struct client_info* client = &clients.data[i];
 			if (FD_ISSET(client->sockfd, &read)) {
-				res = recv(client->sockfd, client->buffer, CLIENT_BUFFLEN, 0);
+				res = recv(client->sockfd, client->buffer + client->bufflen, CLIENT_BUFFLEN - client->bufflen, 0);
 				if (res < 1) {
 					printf("client disconnected.\n");
 					print_client_address(client);
 					drop_client(client);
 				}
 				else {
-					printf("%.*s", res, client->buffer);
+					client->bufflen += res;
+					parse_request(client);
+					if (client->request.finished) {
+						headers* headers = client->request.headers;
+						dump_headers(headers);
+					}
 				}
 			}
 		}

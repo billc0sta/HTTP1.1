@@ -1,50 +1,24 @@
 #ifndef HASHMAP_H_
 #define HASHMAP_H_
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <time.h> 
+#include "headers.h"
+#include "includes.h"
 #define LOAD_FACTOR_MAX 0.6
 #define LOAD_FACTOR_MIN 0.1
 #define INITIAL_BUCKETS 16
-#define INITIAL_DATALEN 1000
-#define MULTIPLY_SPACE 2
+#define MULTIPLY_SPACE (1 * 2) 
+#define HEADERS_SEED 0
 
 #define STATE_UNUSED 0
 #define STATE_USED 1
 #define STATE_DELETED 2
 
-struct value {
-	char* v;
-	int len;
-	struct value* next;
-};
-
-struct bucket {
-	char state;
-	char* key;
-	struct value* val; 
-};
-
-typedef int (*strcmp_func)(char*, char*);
-typedef int (*strhash_func)(char*, unsigned int);
-
-typedef struct {
-	size_t cap;
-	size_t len;
-	struct bucket* buckets;
-	strcmp_func cmp;
-	strhash_func hash;
-	unsigned int seed;
-} hashmap;
-
-static hashmap* hashmap_new(strcmp_func cmp, strhash_func hash, unsigned seed) {
-	hashmap* ret = malloc(sizeof(hashmap));
+headers* make_headers(void) {
+	headers* ret = (headers*)malloc(sizeof(headers));
 	if (!ret) {
 		fprintf(stderr, "[hashmap_new] failed to allocate memory.\n");
 		return NULL;
 	}
-	ret->buckets = calloc(INITIAL_BUCKETS, sizeof(struct bucket));
+	ret->buckets = (struct bucket*)calloc(INITIAL_BUCKETS, sizeof(struct bucket));
 	if (!ret->buckets) {
 		free(ret);
 		fprintf(stderr, "[hashmap_new] failed to allocate memory.\n");
@@ -52,9 +26,6 @@ static hashmap* hashmap_new(strcmp_func cmp, strhash_func hash, unsigned seed) {
 	}
 	ret->cap = INITIAL_BUCKETS;
 	ret->len = 0;
-	ret->cmp = cmp;
-	ret->seed = seed;
-	ret->hash = hash;
 	return ret;
 }
 
@@ -65,13 +36,15 @@ static inline unsigned int murmur_scramble(unsigned int k) {
 	return k;
 }
 
-static unsigned int hashmap_murmur(const void* key, size_t size, unsigned int seed)
+static unsigned int hashstring_murmur(const char* key, size_t size)
 {
-	unsigned int h = seed;
-	unsigned int k;
+	unsigned int h = HEADERS_SEED;
+	unsigned int k = 0;
 	for (size_t i = size >> 2; i; i--) {
-		memcpy(&k, key, sizeof(unsigned int));
-		key = (char*)key + sizeof(unsigned int);
+		k |= tolower(*key++) & 0xff;
+		k |= ((tolower(*key++) & 0xff) << 8);
+		k |= ((tolower(*key++) & 0xff) << 16);
+		k |= ((tolower(*key++) & 0xff) << 24);
 		h ^= murmur_scramble(k);
 		h = (h << 13) | (h >> 19);
 		h = h * 5 + 0xe6546b64;
@@ -79,7 +52,7 @@ static unsigned int hashmap_murmur(const void* key, size_t size, unsigned int se
 	k = 0;
 	for (size_t i = size & 3; i; i--) {
 		k <<= 8;
-		k |= ((char*)key)[i - 1];
+		k |= tolower(key[i - 1]);
 	}
 	h ^= murmur_scramble(k);
 	h ^= size;
@@ -91,38 +64,37 @@ static unsigned int hashmap_murmur(const void* key, size_t size, unsigned int se
 	return h;
 }
 
-
-static unsigned int hash(hashmap* map, char* key) {
-	if (map->hash) return map->hash(key, map->seed);
-	return hashmap_murmur(key, strlen(key), map->seed);
+static int compare(char* str1, char* str2) {
+	while (*str1 && *str2) {
+		if (tolower(*str1) != tolower(*str2))
+			return *str1 - *str2;
+		++str1;
+		++str2;
+	}
+	return *str1 - *str2;
 }
 
-static int compare(hashmap* map, char* str1, char* str2) {
-	if (map->cmp) return map->cmp(str1, str2);
-	return strcmp(str1, str2); 
-}
-
-static struct bucket* hashmap_find(hashmap* map, void* key)
+static struct bucket* headers_find(headers* map, char* key)
 {
-	unsigned int i = hash(map, key);
+	unsigned int i = hashstring_murmur(key, strlen(key)) & (map->cap - 1);
 	struct bucket* bucket;
-	while ((bucket = &map->buckets[i])->state != STATE_UNUSED && compare(map, key, bucket->key) != 0)
+	while ((bucket = &map->buckets[i])->state != STATE_UNUSED && compare(key, bucket->key) != 0)
 		i = (i + 1) & (map->cap - 1);
 
 	return bucket;
 }
 
-static int hashmap_resize(hashmap* map, size_t resize_by);
-static int hashmap_set(hashmap* map, char* key, char* val) {
+int set_header(headers* map, char* key, char* val) {
 	if (!map || !key || !val)
 	{
 		fprintf(stderr, "[hashmap_set] passed NULL pointers for mandatory parameters.\n");
 		return 1;
 	}
-	unsigned int i = hash(map, key);
+	unsigned int i = hashstring_murmur(key, strlen(key)) & (map->cap - 1);
 	struct bucket* deleted_bucket = NULL;
 	struct bucket* bucket = NULL;
-	while ((bucket = &map->buckets[i])->state != STATE_UNUSED && compare(map, key, bucket->key) != 0)
+
+	while ((bucket = &map->buckets[i])->state != STATE_UNUSED && compare(key, bucket->key) != 0)
 	{
 		if (bucket->state == STATE_DELETED)
 			deleted_bucket = bucket;
@@ -137,33 +109,35 @@ static int hashmap_set(hashmap* map, char* key, char* val) {
 
 	int keylen = (int)strlen(key);
 	int vallen = (int)strlen(val);
-	struct value* v = malloc(sizeof(struct value) + vallen + 1);
+	struct value* v = (struct value*)malloc(sizeof(struct value) + vallen + 1);
 	if (!v) {
 		fprintf(stderr, "[hashmap_set] failed to allocate memory.\n");
 		return 1;
 	}
 	v->next = NULL;
+	v->v = (char*)(v + 1);
 	v->v[vallen] = 0;
 	v->len = vallen;
-	memcpy(bucket->val->v, val, vallen);
+	memcpy(v->v, val, vallen);
 	if (bucket->state == STATE_UNUSED)
 	{
-		bucket->key = malloc(keylen + 1);
+		bucket->key = (char*)malloc(keylen + 1);
 		if (!bucket->key) {
 			free(v);
 			fprintf(stderr, "[hashmap_set] failed to allocate memory.\n");
 			return 1;
 		}
-		bucket->key[keylen] = 0;
-		memcpy(bucket->key, key, keylen);
 	}
 	else
 	{
-		if (strlen(bucket->key) < keylen)
+		if (strlen(bucket->key) < keylen) {
 			free(bucket->key);
-		else {
-			bucket->key[keylen] = 0;
-			memcpy(bucket->key, key, keylen);
+			bucket->key = (char*)malloc(keylen + 1);
+			if (!bucket->key) {
+				free(v);
+				fprintf(stderr, "[hashmap_set] failed to allocate memory.\n");
+				return 1;
+			}
 		}
 		struct value* prev = NULL;
 		for (struct value* val = bucket->val; val; val = val->next) {
@@ -171,17 +145,19 @@ static int hashmap_set(hashmap* map, char* key, char* val) {
 			free(prev); // also deallocates the string
 		}
 	}
+	bucket->key[keylen] = 0; 
+	memcpy(bucket->key, key, keylen); 
+	bucket->state = STATE_USED;
 	if (!bucket->val)
 		bucket->val = v;
 	else {
 		v->next = bucket->val;
 		bucket->val = v;
 	}
-	bucket->state = STATE_USED;
 	++map->len;
 
 	if ((float)map->len / map->cap >= LOAD_FACTOR_MAX) {
-		if (hashmap_resize(map, map->cap * MULTIPLY_SPACE)) {
+		if (headers_resize(map, map->cap * MULTIPLY_SPACE)) {
 			fprintf(stderr, "[hashmap_set] hashmap_resize failed.\n");
 			return 1;
 		}
@@ -189,7 +165,7 @@ static int hashmap_set(hashmap* map, char* key, char* val) {
 	return 0; 
 }
 
-static int hashmap_resize(hashmap* map, size_t resize_by)
+static int headers_resize(headers* map, size_t resize_by)
 {
 	if (!map)
 	{
@@ -217,8 +193,8 @@ static int hashmap_resize(hashmap* map, size_t resize_by)
 	{
 		struct bucket* curr = &old_buckets[i];
 		if (curr->state == STATE_USED) {
-			hashmap_find(map, curr->key)->val = curr->val; // safe
-			free(curr->key); 
+			struct bucket* bucket = headers_find(map, curr->key); // safe
+			*bucket = *curr; 
 		}
 
 		else if (curr->state == STATE_DELETED)
@@ -236,21 +212,21 @@ static int hashmap_resize(hashmap* map, size_t resize_by)
 	return 0;
 }
 
-static struct value* hashmap_get(hashmap* map, void* key)
+struct value* get_header(headers* map, char* key)
 {
 	if (!map || key)
 	{
 		fprintf(stderr, "[hahsmap_get] passed NULL pointers for mandatory parameters.\n");
 		return NULL;
 	} 
-	struct bucket* found = hashmap_find(map, key); 
+	struct bucket* found = headers_find(map, key); 
 	if (found->state == STATE_USED)
 		return found->val;
 
 	return NULL;
 }
 
-static int hashmap_remove(hashmap* map, void* key)
+int remove_header(headers* map, char* key)
 {
 	if (!map || key)
 	{
@@ -258,7 +234,7 @@ static int hashmap_remove(hashmap* map, void* key)
 		return 1;
 	}
 
-	struct bucket* found = hashmap_find(map, key);
+	struct bucket* found = headers_find(map, key);
 	if (found->state != STATE_USED)
 		return 1;
 
@@ -266,7 +242,7 @@ static int hashmap_remove(hashmap* map, void* key)
 	--map->len;
 
 	if (map->cap > INITIAL_BUCKETS && (float)map->len / map->cap <= LOAD_FACTOR_MIN) {
-		if (hashmap_resize(map, map->cap / MULTIPLY_SPACE)) {
+		if (headers_resize(map, map->cap / MULTIPLY_SPACE)) {
 			fprintf(stderr, "[hashmap_remove] hashmap_resize failed.\n");
 			return 1;
 		}
@@ -275,10 +251,30 @@ static int hashmap_remove(hashmap* map, void* key)
 	return 0;
 }
 
-static int hashmap_clear(hashmap* map)
+int next_header(headers* map, size_t* iter, char** key, struct value** val)
 {
-	if (!map)
+	if (!map || !iter || !key || !val) {
+		fprintf(stderr, "[hashmap_next] passed NULL pointers for mandatory parameters.\n");
+		return 1;
+	}
+
+	while (*iter < map->cap)
 	{
+		struct bucket* bucket = &map->buckets[*iter];
+		++(*iter);
+		if (bucket->state == STATE_USED)
+		{
+			*key = bucket->key;
+			*val = bucket->val;
+			return 0;
+		}
+	}
+	return 1;
+}
+
+int reset_headers(headers* map)
+{
+	if (!map) {
 		fprintf(stderr, "[hashmap_clear] passed NULL pointers for mandatory parameters.\n");
 		return 1;
 	}
@@ -299,14 +295,14 @@ static int hashmap_clear(hashmap* map)
 	map->len = 0;
 	return 0;
 }
-static int hashmap_free(hashmap* map)
+
+int free_headers(headers* map)
 {
-	if (!map)
-	{
+	if (!map) {
 		fprintf(stderr, "[hashmap_free] passed NULL pointers for mandatory parameters.\n");
 		return 1;
 	}
-	hashmap_clear(map);
+	reset_headers(map);
 	free(map->buckets);
 	free(map);
 	return 0;

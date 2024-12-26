@@ -19,9 +19,7 @@ int reset_client_info(struct client_info* client) {
 	client->bufflen = 0;
 	client->used = 0;
 	client->addrlen = sizeof(client->addr);
-	client->request.finished = 0;
-	client->request.method = METHOD_NONE;
-	client->request.version = HTTP_VERSION_NONE;
+	reset_request_info(&client->request);
 	return 0;
 }
 
@@ -67,8 +65,9 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
 		clients->data = new_data;
 		clients->cap = new_cap;
 		struct client_info* client = &clients->data[counter++];
-		reset_client_info(client);
+		make_request_info(&client->request);
 		client->addr = *addr;
+		client->addrlen = sizeof(struct sockaddr_in);
 		client->sockfd = sockfd;
 		client->used = 1;
 		clients->len = counter;
