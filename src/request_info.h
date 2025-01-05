@@ -6,26 +6,38 @@
 #define BODY_BUFFLEN (1024 * 1024 * 2)
 
 enum {
-	METHOD_GET,
-	METHOD_POST,
-	METHOD_HEAD,
-	METHOD_PUT,
-	METHOD_DELETE,
-	METHOD_CONNECT,
-	METHOD_OPTIONS,
-	METHOD_TRACE,
-	METHOD_PATCH,
-	METHOD_NONE
+  STATE_GOT_NOTHING,
+  STATE_GOT_LINE,
+  STATE_GOT_HEADERS, 
+  STATE_GOT_BODY,
+}; 
+
+enum {
+  METHOD_GET,
+  METHOD_POST,
+  METHOD_HEAD,
+  METHOD_PUT,
+  METHOD_DELETE,
+  METHOD_CONNECT,
+  METHOD_OPTIONS,
+  METHOD_TRACE,
+  METHOD_PATCH,
+  METHOD_NONE
 };
 
 struct request_info {
-	char method;
-	char version;
-	char* resource;
-	char finished;
-	char body[BODY_BUFFLEN + 1];
-	int body_len;
-	headers* headers;
+  char   method;
+  char*  resource;
+  size_t resource_len;
+  char   version;
+  char   body[BODY_BUFFLEN + 1];
+  size_t body_len;
+  headers* headers;
+
+  // non HTTP-related fields
+  char state;
+  SOCKET client_socket;
+  struct sockaddr_in client_address; 
 };
 
 int make_request_info(struct request_info*);

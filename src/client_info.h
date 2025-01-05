@@ -7,19 +7,18 @@
 #define CLIENT_BUFFLEN 512
 
 struct client_info {
-	SOCKET              sockfd;
-	struct sockaddr_in  addr;
-	socklen_t		    addrlen;
-	char                buffer[CLIENT_BUFFLEN + 1];
-	int                 bufflen;
-	char                used;
-	struct request_info request;
+  SOCKET              sockfd;
+  struct sockaddr_in  addr;
+  char                buffer[CLIENT_BUFFLEN + 1];
+  size_t              bufflen;
+  char                used;
+  struct request_info request;
 };
 
 struct client_group {
-	size_t         len;
-	size_t         cap;
-	struct client_info* data;
+  size_t         len;
+  size_t         cap;
+  struct client_info* data;
 };
 
 struct client_info* add_client(struct client_group*, SOCKET, struct sockaddr_in* s);

@@ -5,4 +5,5 @@ HTTP_server.vcxproj
 HTTP_server.vcxproj.filters
 HTTP_server.vcxproj.user
 x64
+HTTP_server
 .vs

@@ -3,30 +3,30 @@
 #include <stdint.h>
 
 struct value {
-	char* v;
-	int len;
-	struct value* next;
+  char* v;
+  int len;
+  struct value* next;
 };
 
 struct bucket {
-	char state;
-	char* key;
-	struct value* val;
+  char state;
+  char* key;
+  struct value* val;
 };
 
-typedef struct {
-	size_t cap;
-	size_t len;
-	struct bucket* buckets;
-} headers;
+struct headers {
+  size_t cap;
+  size_t len;
+  struct bucket* buckets;
+};
 
 
-headers* make_headers(void);
-int set_header(headers*, char*, char*);
-struct value* get_header(headers*, char*);
-int remove_header(headers*, char*);
-int next_header(headers*, size_t*, char**, struct value**);
-int reset_headers(headers*);
-int free_headers(headers*);
+struct headers* make_headers(void);
+int set_header(struct headers*, char*, char*);
+struct value* get_header(struct headers*, char*);
+int remove_header(struct headers*, char*);
+int next_header(struct headers*, size_t*, char**, struct value**);
+int reset_headers(struct headers*);
+int free_headers(struct headers*);
 
 #endif
