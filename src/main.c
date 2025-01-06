@@ -1,21 +1,4 @@
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#define CLOSE_SOCKET(s) closesocket(s)
-#define GET_ERROR() WSAGetLastError()
-#else
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <netdb.h>
-#include <errno.h>
-#define SOCKET int
-#define CLOSE_SOCKET(s) close(s)
-#define GET_ERROR() errno
-#endif
-
-#include "includes.h"
-#include "client_info.h"
-#include "request_parser.h"
+#include "http.h"
 
 static int dump_headers(headers* headers) {
   size_t iter = 0;
@@ -29,77 +12,23 @@ static int dump_headers(headers* headers) {
   return 0;
 }
 
+void request_handler(const http_request* request, http_response* response) {
+  dump_headers(request->headers);
+}
+
 int main() {
-  struct addrinfo hints;
-  struct addrinfo* binder;
-  memset(&hints, 0, sizeof(hints));
-  hints.ai_family   = AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags    = AI_PASSIVE;
-  getaddrinfo(0, "80", &hints, &binder);
-  SOCKET server_sockfd = socket(binder->ai_family, binder->ai_socktype, binder->ai_protocol);
-  if (server_sockfd == INVALID_SOCKET) {
-    fprintf(stderr, "[main] socket() failed - %d.\n", GET_ERROR());
-    exit(1);
+  if (http_init()) {
+    fprintf(stderr, "[main] http_init() failed.\n");
+    exit(1); 
   }
-  if (bind(server_sockfd, binder->ai_addr, (int)binder->ai_addrlen)) {
-    fprintf(stderr, "[main] bind() failed - %d.\n", GET_ERROR());
-    exit(1);
+  
+  http_server* server = http_server_new("0.0.0.0", "80", request_handler);
+  if (!server) {
+    fprintf(stderr, "[main] http_server_new() failed.\n");
   }
-  if (listen(server_sockfd, 10)) {
-    fprintf(stderr, "[main] listen() failed - %d.\n", GET_ERROR());
-    exit(1);
-  }
-  freeaddrinfo(binder);
-  printf("listening...\n");
-
-  struct client_group clients = make_client_group();
-  while (1) {
-    fd_set read;
-    if (ready_clients(&clients, server_sockfd, &read)) {
-      fprintf(stderr, "[main] ready_clients() failed.\n");
-      exit(1);
-    }
-
-    if (FD_ISSET(server_sockfd, &read)) {
-      struct sockaddr_in client_addr;
-      int addrlen = sizeof(client_addr);
-      SOCKET client_socket = accept(server_sockfd, (struct sockaddr*)&client_addr, &addrlen);
-      if (client_socket == INVALID_SOCKET) {
-        fprintf(stderr, "[main] accept() failed - %d.\n", GET_ERROR());
-        exit(1);
-      }
-      struct client_info* client = add_client(&clients, client_socket, &client_addr);
-      if (!client) {
-        fprintf(stderr, "[main] add_client() failed.\n");
-        exit(1);
-      }
-      printf("accepted a client.\n");
-      print_client_address(client);
-    }
-	
-    const size_t cap = clients.cap;
-    for (size_t i = 0; i < cap; ++i) {
-      struct client_info* client = &clients.data[i];
-      if (FD_ISSET(client->sockfd, &read)) {
-        res = recv(client->sockfd, client->buffer + client->bufflen, CLIENT_BUFFLEN - client->bufflen, 0);
-        if (res < 1) {
-          printf("client disconnected.\n");
-          print_client_address(client);
-          drop_client(client);
-        }
-        else {
-          client->bufflen += res;
-          parse_request(client);
-          if (client->request.finished) {
-            headers* headers = client->request.headers;
-            dump_headers(headers);
-          }
-        }
-      }
-    }
-  }
-
-  CLOSE_SOCKET(server_sockfd);
+  http_server_listen(server);
+  
+  http_server_free(server);
+  http_quit();
   return 0;
 }

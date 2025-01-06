@@ -1,7 +1,6 @@
 #ifndef HASHMAP_H_
 #define HASHMAP_H_
 #include "headers.h"
-#include "includes.h"
 #define LOAD_FACTOR_MAX 0.6
 #define LOAD_FACTOR_MIN 0.1
 #define INITIAL_BUCKETS 16
@@ -15,13 +14,13 @@
 headers* make_headers(void) {
   headers* ret = (headers*)malloc(sizeof(headers));
   if (!ret) {
-    http_log(stderr, "[make_headers] failed to allocate memory.\n");
+    HTTP_LOG(HTTP_LOGERR, "[make_headers] failed to allocate memory.\n");
     return NULL;
   }
   ret->buckets = (struct bucket*)calloc(INITIAL_BUCKETS, sizeof(struct bucket));
   if (!ret->buckets) {
     free(ret);
-    http_log(stderr, "[make_headers] failed to allocate memory.\n");
+    HTTP_LOG(HTTP_LOGERR, "[make_headers] failed to allocate memory.\n");
     return NULL;
   }
   ret->cap = INITIAL_BUCKETS;
@@ -86,7 +85,7 @@ static struct bucket* headers_find(headers* map, char* key)
 
 int set_header(headers* map, char* key, char* val) {
   if (!map || !key || !val) {
-    http_log(stderr, "[set_header] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[set_header] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
   unsigned int i = hashstring_murmur(key, strlen(key)) & (map->cap - 1);
@@ -108,7 +107,7 @@ int set_header(headers* map, char* key, char* val) {
   int vallen = (int)strlen(val);
   struct value* v = (struct value*)malloc(sizeof(struct value) + vallen + 1);
   if (!v) {
-    http_log(stderr, "[set_header] failed to allocate memory.\n");
+    HTTP_LOG(HTTP_LOGERR, "[set_header] failed to allocate memory.\n");
     return 1;
   }
   v->next = NULL;
@@ -120,7 +119,7 @@ int set_header(headers* map, char* key, char* val) {
     bucket->key = (char*)malloc(keylen + 1);
     if (!bucket->key) {
       free(v);
-      http_log(stderr, "[set_header] failed to allocate memory.\n");
+      HTTP_LOG(HTTP_LOGERR, "[set_header] failed to allocate memory.\n");
       return 1;
     }
   }
@@ -130,7 +129,7 @@ int set_header(headers* map, char* key, char* val) {
       bucket->key = (char*)malloc(keylen + 1);
       if (!bucket->key) {
         free(v);
-        http_log(stderr, "[set_header] failed to allocate memory.\n");
+        HTTP_LOG(HTTP_LOGERR, "[set_header] failed to allocate memory.\n");
         return 1;
       }
     }
@@ -153,7 +152,7 @@ int set_header(headers* map, char* key, char* val) {
 
   if ((float)map->len / map->cap >= LOAD_FACTOR_MAX) {
     if (resize_headers(map, map->cap * MULTIPLY_SPACE)) {
-      http_log(stderr, "[set_header] hashmap_resize failed.\n");
+      HTTP_LOG(HTTP_LOGERR, "[set_header] hashmap_resize failed.\n");
       return 1;
     }
   }
@@ -163,7 +162,7 @@ int set_header(headers* map, char* key, char* val) {
 static int resize_headers(headers* map, size_t resize_by)
 {
   if (!map) {
-    http_log(stderr, "[resize_headers] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[resize_headers] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
   if (resize_by == 0)
@@ -178,7 +177,7 @@ static int resize_headers(headers* map, size_t resize_by)
   struct bucket* old_buckets = map->buckets;
   struct bucket* new_buckets = (struct bucket*)calloc(map->cap, sizeof(struct bucket));
   if (!new_buckets) {
-    http_log(stderr, "[resize_headers] failed to allocate memory.\n");
+    HTTP_LOG(HTTP_LOGERR, "[resize_headers] failed to allocate memory.\n");
     return 1;
   }
 
@@ -207,7 +206,7 @@ static int resize_headers(headers* map, size_t resize_by)
 struct value* get_header(headers* map, char* key)
 {
   if (!map || key) {
-    http_log(stderr, "[get_header] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[get_header] passed NULL pointers for mandatory parameters.\n");
     return NULL;
   } 
   struct bucket* found = headers_find(map, key); 
@@ -220,7 +219,7 @@ struct value* get_header(headers* map, char* key)
 int remove_header(headers* map, char* key)
 {
   if (!map || key) {
-    http_log(stderr, "[remove_header] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[remove_header] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
 
@@ -233,7 +232,7 @@ int remove_header(headers* map, char* key)
 
   if (map->cap > INITIAL_BUCKETS && (float)map->len / map->cap <= LOAD_FACTOR_MIN) {
     if (headers_resize(map, map->cap / MULTIPLY_SPACE)) {
-      http_log(stderr, "[remove_header] hashmap_resize failed.\n");
+      HTTP_LOG(HTTP_LOGERR, "[remove_header] hashmap_resize failed.\n");
       return 1;
     }
   }
@@ -244,7 +243,7 @@ int remove_header(headers* map, char* key)
 int next_header(headers* map, size_t* iter, char** key, struct value** val)
 {
   if (!map || !iter || !key || !val) {
-    http_log(stderr, "[next_header] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[next_header] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
 
@@ -264,7 +263,7 @@ int next_header(headers* map, size_t* iter, char** key, struct value** val)
 int reset_headers(headers* map)
 {
   if (!map) {
-    http_log(stderr, "[reset_headers] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[reset_headers] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
   for (int i = 0; i < map->cap; ++i) {
@@ -285,7 +284,7 @@ int reset_headers(headers* map)
 
 int free_headers(headers* map) {
   if (!map) {
-    http_log(stderr, "[free_headers] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[free_headers] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
   reset_headers(map);

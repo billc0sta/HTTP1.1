@@ -3,13 +3,12 @@
 
 #include "includes.h"
 #define RESOURCE_BUFFLEN 255
-#define BODY_BUFFLEN (1024 * 1024 * 2)
 
 enum {
   STATE_GOT_NOTHING,
   STATE_GOT_LINE,
   STATE_GOT_HEADERS, 
-  STATE_GOT_BODY,
+  STATE_GOT_ALL,
 }; 
 
 enum {
@@ -30,9 +29,9 @@ struct request_info {
   char*  resource;
   size_t resource_len;
   char   version;
-  char   body[BODY_BUFFLEN + 1];
+  char   body[REQUEST_BODY_BUFFLEN + 1];
   size_t body_len;
-  headers* headers;
+  struct headers* headers;
 
   // non HTTP-related fields
   char state;
@@ -43,5 +42,5 @@ struct request_info {
 int make_request_info(struct request_info*);
 int free_request_info(struct request_info*);
 int reset_request_info(struct request_info*);
-int add_header_request_info(struct request_info* req, char* header, char* value);
+int add_header_request_info(struct request_info*, const char*, const char*);
 #endif

@@ -1,5 +1,4 @@
 #include "request_parser.h "
-#include "includes.h"
 #include "client_info.h"
 #include "request_info.h"
 
@@ -65,8 +64,12 @@ int parse_request(struct client_info* client) {
       if (!q)
         return 1;
       *q = 0;
-      if (strcmp(begin, "HTTP/1.0") == 0)
+      if (strcmp(begin, "HTTP/1.0") == 0) {
+        int method = req->method;
+        if (method != METHOD_GET && method != METHOD_HEAD && method != METHOD_POST)
+          return 1; 
         req->version = HTTP_VERSION_1;
+      }
       else if (strcmp(begin, "HTTP/1.1") == 0)
         req->version = HTTP_VERSION_1_1;
       else
@@ -104,14 +107,20 @@ int parse_request(struct client_info* client) {
     }
     
     else if (req->state == STATE_GOT_HEADERS) {
-      while (q < end && req->body_len < BODY_BUFFLEN) 
+      int method = req->method;
+      if (method == METHOD_POST || method == METHOD_PUT || method == METHOD_PATCH) {
+        req->method = STATE_GOT_ALL;
+        return 0; 
+      }
+      
+      while (q < end && req->body_len < REQUEST_BODY_BUFFLEN) 
         req->body[req->body_len++] = *q++; 
 
-      if (q < end && req->body_len == BODY_BUFFLEN)
+      if (q < end && req->body_len == REQUEST_BODY_BUFFLEN)
         return 1;
     }
-
   }
+  
   client->bufflen = MAX(0, client->bufflen - (q - client->buffer));
   if (client->bufflen > 0)
     memcpy(client->buffer, q, client->bufflen);

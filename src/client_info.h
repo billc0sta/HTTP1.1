@@ -1,8 +1,6 @@
 #ifndef CLIENT_INFO_H_
 #define CLIENT_INFO_H_
-
-#include <WinSock2.h>
-#include <ws2tcpip.h>
+#include "includes.h" 
 #include "request_info.h"
 #define CLIENT_BUFFLEN 512
 

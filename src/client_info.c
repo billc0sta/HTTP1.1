@@ -1,5 +1,4 @@
 #include "client_info.h"
-#include "includes.h"
 
 struct client_group make_client_group() {
   struct client_group clients;
@@ -11,7 +10,7 @@ struct client_group make_client_group() {
 
 int reset_client_info(struct client_info* client) {
   if (!client) {
-    http_log(stderr, "[reset_client_info] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[reset_client_info] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
 
@@ -25,7 +24,7 @@ int reset_client_info(struct client_info* client) {
 
 struct client_info* add_client(struct client_group* clients, SOCKET sockfd, struct sockaddr_in* addr) {
   if (!clients || !addr) {
-    http_log(stderr, "[add_client] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[add_client] passed NULL pointers for mandatory parameters.\n");
     return NULL;
   }
 
@@ -50,7 +49,7 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
     size_t new_cap = cap == 0 ? 8 : cap * 2;
     struct client_info* new_data = calloc(new_cap, sizeof(struct client_info));
     if (new_data == NULL) {
-      http_log(stderr, "[add_client] realloc() failed.\n");
+      HTTP_LOG(HTTP_LOGERR, "[add_client] realloc() failed.\n");
       return NULL;
     }
     struct client_info* old_data = clients->data;
@@ -80,7 +79,7 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
 
 int drop_client(struct client_info* client) {
   if (!client) {
-    http_log(stderr, "[drop_client] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[drop_client] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
 
@@ -93,7 +92,7 @@ int drop_client(struct client_info* client) {
 
 int free_client_info(struct client_info* client) {
   if (!client) {
-    http_log(stderr, "[free_client_info] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[free_client_info] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
   reset_client_info(client);
@@ -103,7 +102,7 @@ int free_client_info(struct client_info* client) {
 
 int free_clients_group(struct client_group* clients) {
   if (!clients) {
-    http_log(stderr, "[free_clients] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[free_clients] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
   size_t cap = clients->cap;
@@ -119,7 +118,7 @@ int free_clients_group(struct client_group* clients) {
 
 int ready_clients(struct client_group* clients, SOCKET server_sockfd, fd_set* read) {
   if (!clients) {
-    http_log(stderr, "[ready_clients] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[ready_clients] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
   const size_t cap = clients->cap;
@@ -138,19 +137,23 @@ int ready_clients(struct client_group* clients, SOCKET server_sockfd, fd_set* re
   timeout.tv_sec = SELECT_SEC;
   timeout.tv_usec = SELECT_USEC;
   if (select(max_socket + 1, read, NULL, NULL, &timeout) < 0) {
-    http_log(stderr, "[ready_clients] select() failed - %d.\n", GET_ERROR());
+    HTTP_LOG(HTTP_LOGERR, "[ready_clients] select() failed - %d.\n", GET_ERROR());
     return 1;
   }
   return 0;
 }
 
 int print_client_address(struct client_info* client) {
+#ifdef HTTP_DEBUG
   if (!client) {
-    http_log(stderr, "[print_client_address] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[print_client_address] passed NULL pointers for mandatory parameters.\n");
     return 1;
   }
   static char address[100];
   getnameinfo((struct sockaddr*)&client->addr, sizeof(client->addr), address, 100, NULL, 0, NI_NUMERICHOST);
   printf("the client's address: %s\n", address);
   return 0;
+#else
+  return 1; 
+#endif
 }

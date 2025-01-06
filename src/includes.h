@@ -9,11 +9,14 @@
 #include "headers.h"
 #define SELECT_SEC 5
 #define SELECT_USEC 0
-#define HTTP_VERSION_1 0
-#define HTTP_VERSION_1_1 1
 #define HTTP_VERSION_NONE 2
 #define MIN(a, b) ((a < b) ? (a) : (b))
 #define MAX(a, b) ((a > b) ? (a) : (b))
+
+enum {
+  HTTP_VERSION_1,
+  HTTP_VERSION_1_1
+}
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -32,12 +35,22 @@
 #define SIN_ADDR sin_addr.s_addr 
 #endif
 
-#ifdef _DEBUG
-#define http_log(f, s) fprintf(f, s)
+#ifdef HTTP_DEBUG
+#ifndef HTTP_LOGOUT 
+#define HTTP_LOGOUT stdout
+#ifndef HTTP_LOGERR
+#define HTTP_LOGERR stderr 
+#define HTTP_LOG(f, s) fprintf(f, s)
 #else
-#define http_log(f, s) ;
+#define HTTP_LOG(f, s) ;
 #endif
 
+#ifndef REQUEST_BODY_BUFFLEN
+#define REQUEST_BODY_BUFFLEN (1024 * 1024)
+#endif
+#ifndef RESPONSE_BODY_BUFFLEN
+#define RESPONSE_BODY_BUFFLEN (1024 * 1024)
+#endif 
 typedef uint32_t ipv4_t;
 
 #endif
