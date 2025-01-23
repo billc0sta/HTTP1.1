@@ -5,12 +5,13 @@
 #define CLIENT_BUFFLEN 512
 
 struct client_info {
-  SOCKET              sockfd;
-  struct sockaddr_in  addr;
-  char                buffer[CLIENT_BUFFLEN + 1];
-  size_t              bufflen;
-  char                used;
-  struct request_info request;
+  SOCKET               sockfd;
+  struct sockaddr_in   addr;
+  char                 buffer[CLIENT_BUFFLEN + 1];
+  size_t               bufflen;
+  char                 used;
+  struct request_info  request;
+  struct response_info response; 
 };
 
 struct client_group {

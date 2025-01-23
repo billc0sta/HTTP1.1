@@ -8,22 +8,22 @@ int http_init(void) {
   int res;
   if (res = WSAStartup(MAKEWORD(2, 2), &data)) {
     fprintf(stderr, "[http_init] WSAStartup() failed - %d.\n", res);
-    return 1;
+    return HTTP_FAILURE;
   }
 #endif
-  return 0;
+  return HTTP_SUCCESS;
 }
 
 int http_quit(void) {  
 #ifdef _WIN32
   if (WSACleanup())
-    return 1;
+    return HTTP_FAILURE;
 #endif
-  return 0;
+  return HTTP_SUCCESS;
 }
 
-void http_default_error_handler(http_request* request, http_response* response) {
-
+void http_default_error_handler(http_request* req, http_response* res) {
+  http_response_set_status(res, 400);
 }
 
 http_server* http_server_new(const char* ip, const char* port, req_handler request_handler) {
@@ -62,25 +62,25 @@ http_server* http_server_new(const char* ip, const char* port, req_handler reque
 int http_server_free(http_server* server) {
   if (!server) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_free] passed NULL pointers for mandatory parameters");
-    return 1;
+    return HTTP_FAILURE;
   }
 
   free_clients_group(server->clients); 
   free(server);
-  return 0;
+  return HTTP_SUCCESS;
 }
 
 int http_server_listen(http_server* server) {
   if (!server) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_listen] passed NULL pointers for mandatory parameters");
-    return 1;
+    return HTTP_FAILURE;
   }
 
   int retval = 0;
   server->sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (server->sockfd < 0) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_listen] socket() failed - %d.\n", GET_ERROR());
-    return 1;
+    return HTTP_FAILURE;
   }
   if (bind(server_sockfd, binder->ai_addr, (int)binder->ai_addrlen)) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_listen] bind() failed - %d.\n", GET_ERROR());
@@ -134,9 +134,10 @@ int http_server_listen(http_server* server) {
         else {
           client->bufflen += res;
           if (parse_request(client))
-            server->error_handler(&client->request); 
+            server->error_handler(&client->request, &client->response); 
           if (client->request.state == STATE_GOT_ALL)
-            server->request_handler(&client->request); 
+            server->request_handler(&client->request, &client->response);
+          send_response(client);
         }
       }
     }
@@ -154,9 +155,9 @@ int http_server_listen(http_server* server) {
 int http_server_set_error_handler(http_server* server, req_handler error_handler) {
   if (!server || error_handler) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_set_error_handler] passed NULL pointers for mandatory parameters");
-    return 1;
+    return HTTP_FAILURE;
   }
 
   server->error_handler = error_handler; 
-  return 0; 
+  return HTTP_SUCCESS; 
 }

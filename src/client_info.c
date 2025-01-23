@@ -11,7 +11,7 @@ struct client_group make_client_group() {
 int reset_client_info(struct client_info* client) {
   if (!client) {
     HTTP_LOG(HTTP_LOGERR, "[reset_client_info] passed NULL pointers for mandatory parameters.\n");
-    return 1;
+    return HTTP_FAILURE;
   }
 
   client->sockfd = INVALID_SOCKET;
@@ -19,7 +19,8 @@ int reset_client_info(struct client_info* client) {
   client->used = 0;
   client->addrlen = sizeof(client->addr);
   reset_request_info(&client->request, client->sockfd, client->addr);
-  return 0;
+  make_response_info(&client->response);
+  return HTTP_SUCCESS;
 }
 
 struct client_info* add_client(struct client_group* clients, SOCKET sockfd, struct sockaddr_in* addr) {
@@ -69,7 +70,7 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
     client->used = 1;
     clients->len = counter;
     make_request_info(&client->request, client->sockfd, client->addr);
-
+    make_response_info(&client->response); 
     return client;
   }
 
@@ -80,30 +81,30 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
 int drop_client(struct client_info* client) {
   if (!client) {
     HTTP_LOG(HTTP_LOGERR, "[drop_client] passed NULL pointers for mandatory parameters.\n");
-    return 1;
+    return HTTP_FAILURE;
   }
 
   closesocket(client->sockfd);
   client->sockfd = 0;
   client->bufflen = 0;
   client->used = 0;
-  return 0;
+  return HTTP_SUCCESS;
 }
 
 int free_client_info(struct client_info* client) {
   if (!client) {
     HTTP_LOG(HTTP_LOGERR, "[free_client_info] passed NULL pointers for mandatory parameters.\n");
-    return 1;
+    return HTTP_FAILURE;
   }
   reset_client_info(client);
   free_request_info(&client->request);
-  return 0; 
+  return HTTP_SUCCESS; 
 }
 
 int free_clients_group(struct client_group* clients) {
   if (!clients) {
     HTTP_LOG(HTTP_LOGERR, "[free_clients] passed NULL pointers for mandatory parameters.\n");
-    return 1;
+    return HTTP_FAILURE;
   }
   size_t cap = clients->cap;
   for (size_t i = 0; i < cap; ++i) {
@@ -113,13 +114,13 @@ int free_clients_group(struct client_group* clients) {
   clients->cap = 0;
   clients->len = 0;
   clients->data = NULL;
-  return 0;
+  return HTTP_SUCCESS;
 }
 
 int ready_clients(struct client_group* clients, SOCKET server_sockfd, fd_set* read) {
   if (!clients) {
     HTTP_LOG(HTTP_LOGERR, "[ready_clients] passed NULL pointers for mandatory parameters.\n");
-    return 1;
+    return HTTP_FAILURE;
   }
   const size_t cap = clients->cap;
   const struct client_info* data = clients->data;
@@ -138,22 +139,22 @@ int ready_clients(struct client_group* clients, SOCKET server_sockfd, fd_set* re
   timeout.tv_usec = SELECT_USEC;
   if (select(max_socket + 1, read, NULL, NULL, &timeout) < 0) {
     HTTP_LOG(HTTP_LOGERR, "[ready_clients] select() failed - %d.\n", GET_ERROR());
-    return 1;
+    return HTTP_FAILURE;
   }
-  return 0;
+  return HTTP_SUCCESS;
 }
 
 int print_client_address(struct client_info* client) {
 #ifdef HTTP_DEBUG
   if (!client) {
     HTTP_LOG(HTTP_LOGERR, "[print_client_address] passed NULL pointers for mandatory parameters.\n");
-    return 1;
+    return HTTP_FAILURE;
   }
   static char address[100];
   getnameinfo((struct sockaddr*)&client->addr, sizeof(client->addr), address, 100, NULL, 0, NI_NUMERICHOST);
   printf("the client's address: %s\n", address);
-  return 0;
+  return HTTP_SUCCESS;
 #else
-  return 1; 
+  return HTTP_FAILURE; 
 #endif
 }

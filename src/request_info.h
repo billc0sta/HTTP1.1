@@ -24,6 +24,12 @@ enum {
   METHOD_NONE
 };
 
+enum {
+  BODYTERMI_LENGTH,
+  BODYTEMRI_CHUNKED,
+  BODYTERMI_NONE
+}
+
 struct request_info {
   char   method;
   char*  resource;
@@ -36,7 +42,10 @@ struct request_info {
   // non HTTP-related fields
   char state;
   SOCKET client_socket;
-  struct sockaddr_in client_address; 
+  struct sockaddr_in client_address;
+  int body_termination;
+  int length;
+  int chunk; 
 };
 
 int make_request_info(struct request_info*);

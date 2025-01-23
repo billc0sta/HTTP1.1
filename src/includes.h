@@ -15,7 +15,8 @@
 
 enum {
   HTTP_VERSION_1,
-  HTTP_VERSION_1_1
+  HTTP_VERSION_1_1,
+  HTTP_VERSION_NONE
 }
 
 #ifdef _WIN32
@@ -50,13 +51,10 @@ enum {
 #endif
 #ifndef RESPONSE_BODY_BUFFLEN
 #define RESPONSE_BODY_BUFFLEN (1024 * 1024)
-#endif 
+#endif
 typedef uint32_t ipv4_t;
 
+#define HTTP_FAILURE 1
+#define HTTP_SUCCESS 0 
+
 #endif
-
-
-/* I will leave some usage notes here:
-   - anything that isn't prefixed with http_ is only meant for internal use
- */
-   
