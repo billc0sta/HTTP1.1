@@ -1,5 +1,6 @@
 #ifndef INCLUDES_H_
 #define INCLUDES_H_
+#define _WIN32_WINNT 0x501
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -9,7 +10,6 @@
 #include "headers.h"
 #define SELECT_SEC 5
 #define SELECT_USEC 0
-#define HTTP_VERSION_NONE 2
 #define MIN(a, b) ((a < b) ? (a) : (b))
 #define MAX(a, b) ((a > b) ? (a) : (b))
 
@@ -17,7 +17,7 @@ enum {
   HTTP_VERSION_1,
   HTTP_VERSION_1_1,
   HTTP_VERSION_NONE
-}
+};
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -37,13 +37,23 @@ enum {
 #endif
 
 #ifdef HTTP_DEBUG
+
+static int HTTP_LOG(int fd, const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  int res = vfprintf(fd, format, args);
+  va_end(args);
+  return res; 
+}
+
 #ifndef HTTP_LOGOUT 
 #define HTTP_LOGOUT stdout
+#endif
 #ifndef HTTP_LOGERR
-#define HTTP_LOGERR stderr 
-#define HTTP_LOG(f, s) fprintf(f, s)
+#define HTTP_LOGERR stderr
+#endif
 #else
-#define HTTP_LOG(f, s) ;
+#define HTTP_LOG(f, s, ...) ;
 #endif
 
 #ifndef REQUEST_BODY_BUFFLEN

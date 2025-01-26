@@ -7,7 +7,7 @@ int http_init(void) {
   WSADATA data;
   int res;
   if (res = WSAStartup(MAKEWORD(2, 2), &data)) {
-    fprintf(stderr, "[http_init] WSAStartup() failed - %d.\n", res);
+    HTTP_LOG(HTTP_LOGERR, "[http_init] WSAStartup() failed - %d.\n", res);
     return HTTP_FAILURE;
   }
 #endif
@@ -31,8 +31,8 @@ http_server* http_server_new(const char* ip, const char* port, req_handler reque
     HTTP_LOG(HTTP_LOGERR, "[http_server_new] passed NULL pointers for mandatory parameters");
     return NULL;
   }
-
-  ip = (strcmp(ip, "0.0.0.0") == 0)
+  
+  if (strcmp(ip, "0.0.0.0") == 0)
     ip = 0;
   
   struct addrinfo hints;
@@ -47,7 +47,7 @@ http_server* http_server_new(const char* ip, const char* port, req_handler reque
   if (!server) {
     freeaddrinfo(binder);
     HTTP_LOG(HTTP_LOGERR, "[http_server_new] failed to allocate memory.\n");
-    return NULL
+    return NULL; 
   }
   
   server->ip      = ntohl(((struct sockaddr_in*)&binder->ai_addr)->SIN_ADDR);
@@ -55,6 +55,7 @@ http_server* http_server_new(const char* ip, const char* port, req_handler reque
   server->clients = make_client_group();
   server->sockfd  = -1;
   server->request_handler = request_handler;
+  server->addr    = *(struct sockaddr_in*)binder->ai_addr;
   freeaddrinfo(binder);
   return server;
 }
@@ -65,10 +66,12 @@ int http_server_free(http_server* server) {
     return HTTP_FAILURE;
   }
 
-  free_clients_group(server->clients); 
+  free_clients_group(&server->clients); 
   free(server);
   return HTTP_SUCCESS;
 }
+
+int send_response(struct client_info* client) {}
 
 int http_server_listen(http_server* server) {
   if (!server) {
@@ -82,21 +85,16 @@ int http_server_listen(http_server* server) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_listen] socket() failed - %d.\n", GET_ERROR());
     return HTTP_FAILURE;
   }
-  if (bind(server_sockfd, binder->ai_addr, (int)binder->ai_addrlen)) {
+  if (bind(server->sockfd, (struct sockaddr*)&server->addr, (int)sizeof(server->addr))) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_listen] bind() failed - %d.\n", GET_ERROR());
     goto fail; 
   }
-  if (listen(server_sockfd, 10)) {
+  if (listen(server->sockfd, 10)) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_listen] listen() failed - %d.\n", GET_ERROR());
     goto fail; 
   }
-  HTTP_LOG(HTTP_LOGOUT, "listening..."); 
-
-  http_response* response = malloc(sizeof(http_response));
-  if (!response) {
-    HTTP_LOG(HTTP_LOGERR, "[http_server_listen] failed to allocate memory.\n");
-    goto fail; 
-  }
+  HTTP_LOG(HTTP_LOGOUT, "listening...");
+  struct client_group clients = make_client_group(); 
   while (1) {
     fd_set read;
     if (ready_clients(&clients, server->sockfd, &read)) {
@@ -107,7 +105,7 @@ int http_server_listen(http_server* server) {
     if (FD_ISSET(server->sockfd, &read)) {
       struct sockaddr_in client_addr;
       int addrlen = sizeof(client_addr);
-      SOCKET client_socket = accept(server_sockfd, (struct sockaddr*)&client_addr, &addrlen);
+      SOCKET client_socket = accept(server->sockfd, (struct sockaddr*)&client_addr, &addrlen);
       if (client_socket < 0) {
         HTTP_LOG(HTTP_LOGERR, "[http_server_listen] accept() failed - %d.\n", GET_ERROR());
         goto fail; 
@@ -125,7 +123,7 @@ int http_server_listen(http_server* server) {
     for (size_t i = 0; i < cap; ++i) {
       struct client_info* client = &clients.data[i];
       if (FD_ISSET(client->sockfd, &read)) {
-        res = recv(client->sockfd, client->buffer + client->bufflen, CLIENT_BUFFLEN - client->bufflen, 0);
+        int res = recv(client->sockfd, client->buffer + client->bufflen, CLIENT_BUFFLEN - client->bufflen, 0);
         if (res < 1) {
           HTTP_LOG(HTTP_LOGOUT, "client disconnected.\n");
           print_client_address(client);

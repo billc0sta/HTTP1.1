@@ -17,8 +17,7 @@ int reset_client_info(struct client_info* client) {
   client->sockfd = INVALID_SOCKET;
   client->bufflen = 0;
   client->used = 0;
-  client->addrlen = sizeof(client->addr);
-  reset_request_info(&client->request, client->sockfd, client->addr);
+  reset_request_info(&client->request, client->sockfd, &client->addr);
   make_response_info(&client->response);
   return HTTP_SUCCESS;
 }
@@ -69,7 +68,7 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
     client->sockfd = sockfd;
     client->used = 1;
     clients->len = counter;
-    make_request_info(&client->request, client->sockfd, client->addr);
+    make_request_info(&client->request, client->sockfd, &client->addr);
     make_response_info(&client->response); 
     return client;
   }

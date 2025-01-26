@@ -61,31 +61,31 @@ const char* status_string[HTTP_STATUS_NONE] =
 
 int make_response_info(struct response_info* res) {
   if (!res) {
-    HTTP_LOG(stderr, "[make_response_info] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[make_response_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
   res->headers = make_headers();
   if (!res->headers) {
-    HTTP_LOG(stderr, "[make_response_info] make_headers() failed.\n");
+    HTTP_LOG(HTTP_LOGERR, "[make_response_info] make_headers() failed.\n");
     return HTTP_FAILURE;
   }
   res->version   = HTTP_VERSION_NONE;
   res->status    = HTTP_STATUS_NONE;
-  res->body[0]   = 0;
-  res->body_len  = 0;
+  res->body_string = NULL;
+  res->string_len  = 0;
   res->body_type = BODYTYPE_NONE;
-  res->file      = NULL;
+  res->file_name = NULL;
   return HTTP_SUCCESS; 
 }
 
 int http_response_set_version(struct response_info* res, int version) {
   if (!res) {
-    HTTP_LOG(stderr, "[http_response_set_version] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[http_response_set_version] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
 
   if (version != HTTP_VERSION_1 && version != HTTP_VERSION_1_1) {
-    HTTP_LOG(stderr, "[http_response] invalid arguments - this version is invalid or unsupported.\n");
+    HTTP_LOG(HTTP_LOGERR, "[http_response] invalid arguments - this version is invalid or unsupported.\n");
     return HTTP_FAILURE;
   }
   res->version = version; 
@@ -94,12 +94,12 @@ int http_response_set_version(struct response_info* res, int version) {
 
 int http_response_set_status(struct response_info* res, int status) {
   if (!res) {
-    HTTP_LOG(stderr, "[http_response_set_status] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[http_response_set_status] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
 
   if (!(status >= HTTP_STATUS_100 && status < HTTP_STATUS_NONE)) {
-    HTTP_LOG(stderr, "[http_response_set_status] invalid arguments - invalid or unsupported status code.\n");
+    HTTP_LOG(HTTP_LOGERR, "[http_response_set_status] invalid arguments - invalid or unsupported status code.\n");
     return HTTP_FAILURE;
   }
   res->status = status; 
@@ -108,32 +108,32 @@ int http_response_set_status(struct response_info* res, int status) {
 
 int http_response_set_body(struct response_info* res, const unsigned char* bytes, size_t len) {
   if (!res) {
-    HTTP_LOG(stderr, "[http_response_set_body] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[http_response_set_body] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
   res->body_string = bytes;
-  res->body_len    = len;
+  res->string_len  = len;
   res->body_type   = BODYTYPE_STRING;
-  return HTTP_SUCCESS:
+  return HTTP_SUCCESS;
 }
 
 int http_response_set_body_file(struct response_info* res, const char* file_name) {
-  if (!res || !file) {
-    HTTP_LOG(stderr, "[http_response_set_body_file] passed NULL pointers for mandatory parameters.\n");
+  if (!res || !file_name) {
+    HTTP_LOG(HTTP_LOGERR, "[http_response_set_body_file] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  res->body_file = file_name;
+  res->file_name = file_name;
   res->body_type = BODYTYPE_FILE; 
   return HTTP_SUCCESS;
 }
 
 int http_response_set_header(struct response_info* res, const char* name, const char* value) {
   if (!res || !name || !value) {
-    HTTP_LOG(stderr, "[http_response_set_header] passed NULL pointers for mandatory parameters.\n");
+    HTTP_LOG(HTTP_LOGERR, "[http_response_set_header] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  if (set_header(res->header, name, value) == HTTP_FAILURE) {
-    HTTP_LOG(stderr, "[http_response_set_header] set_header() failed.\n");
+  if (set_header(res->headers, name, value) == HTTP_FAILURE) {
+    HTTP_LOG(HTTP_LOGERR, "[http_response_set_header] set_header() failed.\n");
     return HTTP_FAILURE;
   } 
   return HTTP_SUCCESS;

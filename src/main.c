@@ -1,6 +1,6 @@
 #include "http.h"
 
-static int dump_headers(headers* headers) {
+static int dump_headers(struct headers* headers) {
   size_t iter = 0;
   struct value* values;
   char* name;
@@ -12,7 +12,7 @@ static int dump_headers(headers* headers) {
   return 0;
 }
 
-void request_handler(const http_request* request, http_response* response) {
+void request_handler(http_request* request, http_response* response) {
   dump_headers(request->headers);
 }
 

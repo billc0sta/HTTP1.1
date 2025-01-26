@@ -73,8 +73,9 @@ struct response_info {
   int status;
   struct headers* headers;
   const unsigned char* body_string;
-  size_t body_len;
+  size_t string_len;
   FILE* body_file;
+  const char* file_name;
   int body_type;
 };
 
@@ -82,6 +83,6 @@ int make_response_info(struct response_info*);
 int http_response_set_version(struct response_info*, int);
 int http_response_set_status(struct response_info*, int);
 int http_response_set_body(struct response_info*, const unsigned char*, size_t);
-int http_response_set_body_file(struct response_info*, const unsigned char*, FILE*); 
+int http_response_set_body_file(struct response_info*, const char* file_name); 
 int http_response_set_header(struct response_info*, const char*, const char*);
 #endif

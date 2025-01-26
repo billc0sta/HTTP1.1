@@ -2,6 +2,7 @@
 #define CLIENT_INFO_H_
 #include "includes.h" 
 #include "request_info.h"
+#include "response_info.h"
 #define CLIENT_BUFFLEN 512
 
 struct client_info {

@@ -1,0 +1,1 @@
+gcc -o http.exe src/client_info.c src/headers.c src/http.c src/main.c src/request_info.c src/request_parser.c src/response_info.c -lws2_32 

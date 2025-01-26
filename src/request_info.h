@@ -26,9 +26,9 @@ enum {
 
 enum {
   BODYTERMI_LENGTH,
-  BODYTEMRI_CHUNKED,
+  BODYTERMI_CHUNKED,
   BODYTERMI_NONE
-}
+};
 
 struct request_info {
   char   method;
@@ -48,8 +48,8 @@ struct request_info {
   int chunk; 
 };
 
-int make_request_info(struct request_info*);
+int make_request_info(struct request_info*, SOCKET, struct sockaddr_in*);
 int free_request_info(struct request_info*);
-int reset_request_info(struct request_info*);
+int reset_request_info(struct request_info*, SOCKET, struct sockaddr_in*);
 int add_header_request_info(struct request_info*, const char*, const char*);
 #endif

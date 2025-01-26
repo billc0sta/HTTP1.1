@@ -20,11 +20,10 @@ struct headers {
   struct bucket* buckets;
 };
 
-
 struct headers* make_headers(void);
-int set_header(struct headers*, char*, char*);
-struct value* get_header(struct headers*, char*);
-int remove_header(struct headers*, char*);
+int set_header(struct headers*, const char*, const char*);
+struct value* get_header(struct headers*, const char*);
+int remove_header(struct headers*, const char*);
 int next_header(struct headers*, size_t*, char**, struct value**);
 int reset_headers(struct headers*);
 int free_headers(struct headers*);

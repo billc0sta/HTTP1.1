@@ -46,13 +46,13 @@ int reset_request_info(struct request_info* req, SOCKET client_socket, struct so
     return HTTP_FAILURE;
   }
   reset_headers(req->headers);
-  req->state = STATE_GOT_NOTHING;
+  req->state    = STATE_GOT_NOTHING;
   req->method   = METHOD_NONE;
   req->version  = HTTP_VERSION_NONE;
   req->body_len = 0;
-  req->request_len    = 0;
-  req->client_socket  = client_socket;
-  req->client_address = *client_address;
+  req->resource_len     = 0;
+  req->client_socket    = client_socket;
+  req->client_address   = *client_address;
   req->body_termination = BODYTERMI_NONE;
   req->length = 0;
   req->chunk  = 0; 

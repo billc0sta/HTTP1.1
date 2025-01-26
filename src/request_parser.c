@@ -1,4 +1,4 @@
-#include "request_parser.h "
+#include "request_parser.h"
 #include "client_info.h"
 #include "request_info.h"
 
@@ -123,9 +123,9 @@ int parse_request(struct client_info* client) {
           req->state = STATE_GOT_ALL;
       }
       
-      if (req->body_termination == BODYTERMI_CHUNK) {
+      if (req->body_termination == BODYTERMI_CHUNKED) {
         if (req->chunk == 0) {
-          char hex[8] = 0;
+          char hex[8] = { 0 };
           char c = *q;
           int i  = 0;
           while (i < 7 && q < end && c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
