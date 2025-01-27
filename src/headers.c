@@ -115,8 +115,8 @@ static int resize_headers(struct headers* map, size_t resize_by)
 
     else if (curr->state == STATE_DELETED) {
       free(curr->key);
-      struct value* prev = NULL;
-      for (struct value* val = curr->val; val; val = val->next) {
+      struct header_value* prev = NULL;
+      for (struct header_value* val = curr->val; val; val = val->next) {
         prev = val;
         free(prev);
       }
@@ -149,7 +149,7 @@ int set_header(struct headers* map, const char* key, const char* val) {
 
   int keylen = (int)strlen(key);
   int vallen = (int)strlen(val);
-  struct value* v = (struct value*)malloc(sizeof(struct value) + vallen + 1);
+  struct header_value* v = (struct header_value*)malloc(sizeof(struct header_value) + vallen + 1);
   if (!v) {
     HTTP_LOG(HTTP_LOGERR, "[set_header] failed to allocate memory.\n");
     return HTTP_FAILURE;
@@ -160,8 +160,8 @@ int set_header(struct headers* map, const char* key, const char* val) {
   v->len = vallen;
   memcpy(v->v, val, vallen);
   if (bucket->state == STATE_UNUSED) {
-    bucket->key = (char*)malloc(keylen + 1);
-    if (!bucket->key) {
+    bucket->key->v = (char*)malloc(keylen + 1);
+    if (!bucket->key->v) {
       free(v);
       HTTP_LOG(HTTP_LOGERR, "[set_header] failed to allocate memory.\n");
       return HTTP_FAILURE;
@@ -170,21 +170,22 @@ int set_header(struct headers* map, const char* key, const char* val) {
   else	{
     if (strlen(bucket->key) < keylen) {
       free(bucket->key);
-      bucket->key = (char*)malloc(keylen + 1);
-      if (!bucket->key) {
+      bucket->key->v = (char*)malloc(keylen + 1);
+      if (!bucket->key->v) {
         free(v);
         HTTP_LOG(HTTP_LOGERR, "[set_header] failed to allocate memory.\n");
         return HTTP_FAILURE;
       }
     }
-    struct value* prev = NULL;
-    for (struct value* val = bucket->val; val; val = val->next) {
+    struct header_value* prev = NULL;
+    for (struct header_value* val = bucket->val; val; val = val->next) {
       prev = val;
       free(prev); // also deallocates the string
     }
   }
-  bucket->key[keylen] = 0; 
-  memcpy(bucket->key, key, keylen); 
+  bucket->key->len       = keylen; 
+  bucket->key->v[keylen] = 0; 
+  memcpy(bucket->key->v, key, keylen);
   bucket->state = STATE_USED;
   if (!bucket->val)
     bucket->val = v;
@@ -203,7 +204,7 @@ int set_header(struct headers* map, const char* key, const char* val) {
   return HTTP_SUCCESS; 
 }
 
-struct value* get_header(struct headers* map, const char* key)
+struct header_value* get_header(struct headers* map, const char* key)
 {
   if (!map || key) {
     HTTP_LOG(HTTP_LOGERR, "[get_header] passed NULL pointers for mandatory parameters.\n");
@@ -240,7 +241,7 @@ int remove_header(struct headers* map, const char* key)
   return HTTP_SUCCESS;
 }
 
-int next_header(struct headers* map, size_t* iter, char** key, struct value** val)
+int next_header(struct headers* map, size_t* iter, struct header_key* key, struct header_value** val)
 {
   if (!map || !iter || !key || !val) {
     HTTP_LOG(HTTP_LOGERR, "[next_header] passed NULL pointers for mandatory parameters.\n");
@@ -270,8 +271,8 @@ int reset_headers(struct headers* map)
     struct bucket* bucket = &map->buckets[i];
     if (bucket->state != STATE_UNUSED) {
       free(bucket->key);
-      struct value* prev = NULL;
-      for (struct value* val = bucket->val; val; val = val->next) {
+      struct header_value* prev = NULL;
+      for (struct header_value* val = bucket->val; val; val = val->next) {
         prev = val;
         free(prev);
       }

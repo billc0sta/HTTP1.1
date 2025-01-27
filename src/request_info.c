@@ -9,12 +9,12 @@ int make_request_info(struct request_info* req, SOCKET client_socket, struct soc
   req->method = METHOD_NONE;
   req->resource = malloc(RESOURCE_BUFFLEN + 1);
   if (!req->resource) {
-    HTTP_LOG(HTTP_LOGERR, "[make_request_info] failed to allocate memory.\n");
+    HTTP_LOG(HTTP_LOGERR, "[make_request_info] malloc() failed.\n");
     return HTTP_FAILURE;
   }
   req->headers = make_headers(); 
   if (!req->headers) {
-    HTTP_LOG(HTTP_LOGERR, "[make_request_info] hashmap_new() failed.\n");
+    HTTP_LOG(HTTP_LOGERR, "[make_request_info] make_headers() failed.\n");
     return HTTP_FAILURE;
   }
   req->resource_len = 0;

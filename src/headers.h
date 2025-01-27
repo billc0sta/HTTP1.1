@@ -2,16 +2,21 @@
 #define HEADERS_H_
 #include "includes.h"
 
-struct value {
+struct header_key {
   char* v;
-  int len;
+  size_t len;
+}
+
+struct header_value {
+  char* v;
+  size_t len;
   struct value* next;
 };
 
 struct bucket {
   char state;
-  char* key;
-  struct value* val;
+  struct header_key key;
+  struct header_value* val;
 };
 
 struct headers {

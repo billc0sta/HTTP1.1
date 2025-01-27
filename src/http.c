@@ -26,7 +26,7 @@ void http_default_error_handler(http_request* req, http_response* res) {
   http_response_set_status(res, 400);
 }
 
-http_server* http_server_new(const char* ip, const char* port, req_handler request_handler) {
+http_server* http_server_new(const char* ip, const char* port, request_handler request_handler, http_constraints* constraints) {
   if (!ip || !port || !request_handler) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_new] passed NULL pointers for mandatory parameters");
     return NULL;
@@ -50,12 +50,13 @@ http_server* http_server_new(const char* ip, const char* port, req_handler reque
     return NULL; 
   }
   
-  server->ip      = ntohl(((struct sockaddr_in*)&binder->ai_addr)->SIN_ADDR);
-  server->port    = ntohs(((struct sockaddr_in*)&binder->ai_addr)->sin_port);
-  server->clients = make_client_group();
-  server->sockfd  = -1;
+  server->ip              = ntohl(((struct sockaddr_in*)&binder->ai_addr)->SIN_ADDR);
+  server->port            = ntohs(((struct sockaddr_in*)&binder->ai_addr)->sin_port);
+  server->clients         = make_client_group();
+  server->sockfd          = -1;
   server->request_handler = request_handler;
-  server->addr    = *(struct sockaddr_in*)binder->ai_addr;
+  server->addr            = *(struct sockaddr_in*)binder->ai_addr;
+  server->constraints     = constraints ? *constraints : http_make_default_constraints(); 
   freeaddrinfo(binder);
   return server;
 }
@@ -71,7 +72,21 @@ int http_server_free(http_server* server) {
   return HTTP_SUCCESS;
 }
 
-int send_response(struct client_info* client) {}
+int send_response(struct client_info* client) {
+  char* buffer = client->buffer;
+  struct headers* headers = client->response.headers;
+  
+  struct header_value* val;
+  struct header_key key;
+  size_t iter; 
+  while (next_header(headers, &iter, &key, &val) == HTTP_SUCCESS) {
+    send(client->sockfd, key->v, key->len, 0);
+    while (val) {
+      send(client->sockfd, val->v, val->len, 0);
+      val = val->next; 
+    }
+  }
+}
 
 int http_server_listen(http_server* server) {
   if (!server) {
@@ -126,7 +141,9 @@ int http_server_listen(http_server* server) {
         int res = recv(client->sockfd, client->buffer + client->bufflen, CLIENT_BUFFLEN - client->bufflen, 0);
         if (res < 1) {
           HTTP_LOG(HTTP_LOGOUT, "client disconnected.\n");
+#ifdef HTTP_DEBUG
           print_client_address(client);
+#endif
           drop_client(client);
         }
         else {
@@ -150,7 +167,7 @@ int http_server_listen(http_server* server) {
   return retval; 
 }
 
-int http_server_set_error_handler(http_server* server, req_handler error_handler) {
+int http_server_set_error_handler(http_server* server, request_handler error_handler) {
   if (!server || error_handler) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_set_error_handler] passed NULL pointers for mandatory parameters");
     return HTTP_FAILURE;
@@ -159,3 +176,17 @@ int http_server_set_error_handler(http_server* server, req_handler error_handler
   server->error_handler = error_handler; 
   return HTTP_SUCCESS; 
 }
+
+http_constraints http_make_default_constraints() {
+  http_constraints constraints = {
+    .client_buffer_len = 1024;                  /* 1MB                */
+    .request_max_body_len = 1024 * 1024 * 2;    /* 2MB                */
+    .request_max_uri_len  = 2048;               /* 2KB: standard spec */
+    .request_max_headers  = 24;                 /* arbitrary          */
+    .request_max_headers_len = 1024 * 1024 * 8; /* 8MB                */
+    .recv_len = 1024 * 1024;                    /* 1MB                */
+    .send_len = 1024 * 1024;                    /* 1MB                */
+  };
+  return constraints;
+}
+

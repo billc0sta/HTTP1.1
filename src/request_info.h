@@ -2,8 +2,6 @@
 #define REQUEST_INFO_H_
 
 #include "includes.h"
-#define RESOURCE_BUFFLEN 255
-
 enum {
   STATE_GOT_NOTHING,
   STATE_GOT_LINE,
@@ -39,7 +37,7 @@ struct request_info {
   size_t body_len;
   struct headers* headers;
 
-  // non HTTP-related fields
+  // shouldn't be modified by the user
   char state;
   SOCKET client_socket;
   struct sockaddr_in client_address;

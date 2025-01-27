@@ -9,3 +9,4 @@ HTTP_server
 .vs
 todo.txt
 ws2_32.lib
+http.exe

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <assert.h> 
 #include "headers.h"
 #define SELECT_SEC 5
 #define SELECT_USEC 0
@@ -56,15 +57,19 @@ static int HTTP_LOG(int fd, const char* format, ...) {
 #define HTTP_LOG(f, s, ...) ;
 #endif
 
-#ifndef REQUEST_BODY_BUFFLEN
-#define REQUEST_BODY_BUFFLEN (1024 * 1024)
-#endif
-#ifndef RESPONSE_BODY_BUFFLEN
-#define RESPONSE_BODY_BUFFLEN (1024 * 1024)
-#endif
 typedef uint32_t ipv4_t;
 
 #define HTTP_FAILURE 1
 #define HTTP_SUCCESS 0 
+
+struct _http_constraints {
+  size_t client_buffer_len;
+  size_t request_max_body_len;
+  size_t request_max_uri_len;
+  size_t request_max_headers;
+  size_t request_max_header_len;
+  size_t recv_len;
+  size_t send_len; 
+};
 
 #endif
