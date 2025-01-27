@@ -4,10 +4,6 @@
 #include "client_info.h" 
 #include "request_info.h"
 #include "headers.h"
-typedef struct request_info  http_request;
-typedef struct response_info http_response;
-typedef struct _http_constraints http_constraints;
-typedef struct headers http_headers;
 typedef void (*request_handler) (http_request*, http_response*);
 
 typedef struct {
@@ -18,7 +14,7 @@ typedef struct {
   req_handler request_handler;
   req_handler error_handler; 
   struct client_group clients;
-  struct _http_constraints constraints;
+  http_constraints constraints;
 } http_server;
 
 int http_init(void);

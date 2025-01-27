@@ -2,11 +2,11 @@
 
 static int dump_headers(struct headers* headers) {
   size_t iter = 0;
-  struct value* values;
-  char* name;
+  http_hdv* values;
+  http_hdk  name;
   while (next_header(headers, &iter, &name, &values) == 0) {
-    for (struct value* curr = values; curr; curr = curr->next) {
-      printf("-- {%s:%s}\n", name, curr->v);
+    for (struct header_value* curr = values; curr; curr = curr->next) {
+      printf("-- {%s:%s}\n", name->v, curr->v);
     }
   }
   return 0;

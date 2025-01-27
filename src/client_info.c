@@ -1,22 +1,22 @@
 #include "client_info.h"
 
-struct client_group make_client_group(size_t body_len) {
+struct client_group make_client_group(http_constraints* constraints) {
   struct client_group clients;
   clients.cap      = 0;
   clients.len      = 0;
   clients.data     = NULL;
-  clients.body_len = body_len;
+  clients.constraints = constraints;
   return clients;
 }
 
-int reset_client_info(struct client_info* client,) {
+int reset_client_info(struct client_info* client) {
   if (!client) {
     HTTP_LOG(HTTP_LOGERR, "[reset_client_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
 
   client->sockfd = INVALID_SOCKET;
-  client->bufflen = 0;
+  client->buff_len = 0;
   client->used = 0;
   reset_request_info(&client->request, client->sockfd, &client->addr);
   make_response_info(&client->response);
@@ -65,19 +65,11 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
     clients->data = new_data;
     clients->cap  = new_cap;
     struct client_info* client = &clients->data[counter++];
-    if (!client->body) {
-      client->body_len = clients->body_len;
-      client->body     = malloc(client->body_len);
-      if (!client->body) {
-        HTTP_LOG(HTTP_LOGERR, "[add_client] malloc() failed.\n");
-        return NULL;
-      }
-    }
     client->addr = *addr;
     client->sockfd = sockfd;
     client->used = 1;
     clients->len = counter;
-    make_request_info(&client->request, client->sockfd, &client->addr);
+    make_request_info(&client->request, client->sockfd, &client->addr, clients->constraints);
     make_response_info(&client->response); 
     return client;
   }

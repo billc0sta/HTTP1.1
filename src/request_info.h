@@ -2,12 +2,6 @@
 #define REQUEST_INFO_H_
 
 #include "includes.h"
-enum {
-  STATE_GOT_NOTHING,
-  STATE_GOT_LINE,
-  STATE_GOT_HEADERS, 
-  STATE_GOT_ALL,
-}; 
 
 enum {
   METHOD_GET,
@@ -28,26 +22,27 @@ enum {
   BODYTERMI_NONE
 };
 
-struct request_info {
+typedef struct {
   char   method;
-  char*  resource;
-  size_t resource_len;
   char   version;
-  char   body[REQUEST_BODY_BUFFLEN + 1];
-  size_t body_len;
-  struct headers* headers;
+  char*  uri;
+  size_t uri_len;
+  char*  body;
+  size_t body_len; 
+  http_headers* headers;
 
-  // shouldn't be modified by the user
+  // internal use 
   char state;
   SOCKET client_socket;
   struct sockaddr_in client_address;
   int body_termination;
-  int length;
-  int chunk; 
-};
+  size_t length;
+  size_t chunk; 
+} http_request;
 
-int make_request_info(struct request_info*, SOCKET, struct sockaddr_in*);
-int free_request_info(struct request_info*);
-int reset_request_info(struct request_info*, SOCKET, struct sockaddr_in*);
-int add_header_request_info(struct request_info*, const char*, const char*);
+int http_request_make(http_request*, SOCKET, struct sockaddr_in*);
+int http_request_free(http_request*);
+int http_request_reset(http_request*, SOCKET, struct sockaddr_in*);
+int http_request_add_header(http_request*, const char*, const char*);
+
 #endif

@@ -68,21 +68,25 @@ enum {
   HTTP_STATUS_NONE
 };
 
-struct response_info {
+typedef struct {
   int version;
   int status;
-  struct headers* headers;
+  http_headers* headers;
   const unsigned char* body_string;
   size_t string_len;
   FILE* body_file;
   const char* file_name;
   int body_type;
-};
 
-int make_response_info(struct response_info*);
-int http_response_set_version(struct response_info*, int);
-int http_response_set_status(struct response_info*, int);
-int http_response_set_body(struct response_info*, const unsigned char*, size_t);
-int http_response_set_body_file(struct response_info*, const char* file_name); 
-int http_response_set_header(struct response_info*, const char*, const char*);
+  // internal use
+  char state;
+} http_response;
+
+int http_response_make(http_response*);
+int http_response_set_version(http_response*, int);
+int http_response_set_status(http_response*, int);
+int http_response_set_body(http_response*, const unsigned char*, size_t);
+int http_response_set_body_file(http_response*, const char* file_name); 
+int http_response_set_header(http_response*, const char*, const char*);
+int http_response_status_info(int);  
 #endif

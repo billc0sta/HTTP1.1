@@ -2,35 +2,35 @@
 #define HEADERS_H_
 #include "includes.h"
 
-struct header_key {
+typedef struct {
   char* v;
   size_t len;
-}
+} http_hdk;
 
-struct header_value {
+typedef struct __http_hdv {
   char* v;
   size_t len;
-  struct value* next;
-};
+  struct __http_hdv* next;
+} http_hdv;
 
 struct bucket {
   char state;
-  struct header_key key;
-  struct header_value* val;
+  http_hdk key;
+  http_hdv* val;
 };
 
-struct headers {
+typedef struct {
   size_t cap;
   size_t len;
   struct bucket* buckets;
-};
+} http_headers;
 
-struct headers* make_headers(void);
-int set_header(struct headers*, const char*, const char*);
-struct value* get_header(struct headers*, const char*);
-int remove_header(struct headers*, const char*);
-int next_header(struct headers*, size_t*, char**, struct value**);
-int reset_headers(struct headers*);
-int free_headers(struct headers*);
+http_headers* make_headers(void);
+int set_header(http_headers*, const char*, const char*);
+http_hdv* get_header(http_headers*, const char*);
+int remove_header(http_headers*, const char*);
+int next_header(http_headers*, size_t*, http_hdk*, http_hdv**);
+int reset_headers(http_headers*);
+int free_headers(http_headers*);
 
 #endif

@@ -3,29 +3,29 @@
 #include "includes.h" 
 #include "request_info.h"
 #include "response_info.h"
-#define CLIENT_BUFFLEN 512
+#define CLIENT_BUFFER_LEN 1024
 
 struct client_info {
   SOCKET               sockfd;
   struct sockaddr_in   addr;
-  char*                buffer;
+  char                 buffer[CLIENT_BUFFER_LEN + 1];
   size_t               buff_len;
   size_t               buff_used; 
   char                 used;
-  struct request_info  request;
-  struct response_info response; 
+  http_request  request;
+  http_response response; 
 };
 
 struct client_group {
   size_t         len;
   size_t         cap;
-  size_t         body_len;
+  http_constraints* constraints; 
   struct client_info* data;
 };
 
 struct client_info* add_client(struct client_group*, SOCKET, struct sockaddr_in* s);
 int drop_client(struct client_info*);
-struct client_group make_client_group(size_t);
+struct client_group make_client_group(http_constraints*);
 int free_clients_group(struct client_group*);
 int ready_clients(struct client_group*, SOCKET, fd_set*);
 int reset_client_info(struct client_info*);

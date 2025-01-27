@@ -59,7 +59,7 @@ const char* status_string[HTTP_STATUS_NONE] =
     [HTTP_STATUS_511] = "Network Authentication Required",
   };
 
-int make_response_info(struct response_info* res) {
+int http_response_make(http_response* res) {
   if (!res) {
     HTTP_LOG(HTTP_LOGERR, "[make_response_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
@@ -75,10 +75,11 @@ int make_response_info(struct response_info* res) {
   res->string_len  = 0;
   res->body_type = BODYTYPE_NONE;
   res->file_name = NULL;
+  res->state     = STATE_GOT_NOTHING;
   return HTTP_SUCCESS; 
 }
 
-int http_response_set_version(struct response_info* res, int version) {
+int http_response_set_version(http_response* res, int version) {
   if (!res) {
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_version] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
@@ -92,7 +93,7 @@ int http_response_set_version(struct response_info* res, int version) {
   return HTTP_SUCCESS;
 }
 
-int http_response_set_status(struct response_info* res, int status) {
+int http_response_set_status(http_response* res, int status) {
   if (!res) {
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_status] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
@@ -106,7 +107,7 @@ int http_response_set_status(struct response_info* res, int status) {
   return HTTP_SUCCESS;
 }
 
-int http_response_set_body(struct response_info* res, const unsigned char* bytes, size_t len) {
+int http_response_set_body(http_response* res, const unsigned char* bytes, size_t len) {
   if (!res) {
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_body] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
@@ -117,7 +118,7 @@ int http_response_set_body(struct response_info* res, const unsigned char* bytes
   return HTTP_SUCCESS;
 }
 
-int http_response_set_body_file(struct response_info* res, const char* file_name) {
+int http_response_set_body_file(http_response* res, const char* file_name) {
   if (!res || !file_name) {
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_body_file] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
@@ -127,7 +128,7 @@ int http_response_set_body_file(struct response_info* res, const char* file_name
   return HTTP_SUCCESS;
 }
 
-int http_response_set_header(struct response_info* res, const char* name, const char* value) {
+int http_response_set_header(http_response* res, const char* name, const char* value) {
   if (!res || !name || !value) {
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_header] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;

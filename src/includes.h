@@ -34,7 +34,8 @@ enum {
 #define SOCKET int
 #define CLOSE_SOCKET(s) close(s)
 #define GET_ERROR() errno
-#define SIN_ADDR sin_addr.s_addr 
+#define SIN_ADDR sin_addr.s_addr
+#define SOCKET_ERROR -1
 #endif
 
 #ifdef HTTP_DEBUG
@@ -58,18 +59,24 @@ static int HTTP_LOG(int fd, const char* format, ...) {
 #endif
 
 typedef uint32_t ipv4_t;
-
+ 
 #define HTTP_FAILURE 1
 #define HTTP_SUCCESS 0 
 
-struct _http_constraints {
-  size_t client_buffer_len;
+typedef struct {
   size_t request_max_body_len;
   size_t request_max_uri_len;
   size_t request_max_headers;
   size_t request_max_header_len;
   size_t recv_len;
   size_t send_len; 
+} http_constraints;
+
+enum {
+  STATE_GOT_NOTHING,
+  STATE_GOT_LINE,
+  STATE_GOT_HEADERS, 
+  STATE_GOT_ALL,
 };
 
 #endif

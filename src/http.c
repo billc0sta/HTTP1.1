@@ -52,11 +52,11 @@ http_server* http_server_new(const char* ip, const char* port, request_handler r
   
   server->ip              = ntohl(((struct sockaddr_in*)&binder->ai_addr)->SIN_ADDR);
   server->port            = ntohs(((struct sockaddr_in*)&binder->ai_addr)->sin_port);
-  server->clients         = make_client_group();
   server->sockfd          = -1;
   server->request_handler = request_handler;
   server->addr            = *(struct sockaddr_in*)binder->ai_addr;
-  server->constraints     = constraints ? *constraints : http_make_default_constraints(); 
+  server->constraints     = constraints ? *constraints : http_make_default_constraints();
+  server->clients         = make_client_group(&server->constraints); 
   freeaddrinfo(binder);
   return server;
 }
@@ -72,20 +72,35 @@ int http_server_free(http_server* server) {
   return HTTP_SUCCESS;
 }
 
-int send_response(struct client_info* client) {
+int http_send_response(struct client_info* client, http_constraints* constraints) {
+  http_response* res = client->response;
+  http_request* req  = client->request;
+
+  size_t sent = 0;
+  size_t max_send = constraints->send_len;
   char* buffer = client->buffer;
-  struct headers* headers = client->response.headers;
-  
-  struct header_value* val;
-  struct header_key key;
-  size_t iter; 
-  while (next_header(headers, &iter, &key, &val) == HTTP_SUCCESS) {
-    send(client->sockfd, key->v, key->len, 0);
-    while (val) {
-      send(client->sockfd, val->v, val->len, 0);
-      val = val->next; 
+  SOCKET sockfd = client->sockfd;
+  while (sent < max_send) {
+    if (res->state == STATE_GOT_NOTHING) {
+      snprintf(buffer, CLIENT_BUFFER_LEN, "%d %s %s\r\n",
+               res->status,
+               http_response_status_info(res->status),
+               req->version == HTTP_VERSION_1_1 ? "HTTP/1.1" : "HTTP/1.0");
+      if ((sent = send(sockfd, buffer, strlen(buffer), 0)) == SOCKET_ERROR) {
+        HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+        return HTTP_FAILURE; 
+      } 
+      res->state = STATE_GOT_LINE; 
     }
-  }
+    else if (res->state == STATE_GOT_LINE) {
+      
+    }
+
+    else if (res->state == STATE_GOT_HEADERS) {
+      fread();
+    }
+  } 
+  return HTTP_SUCCESS;
 }
 
 int http_server_listen(http_server* server) {
@@ -94,7 +109,7 @@ int http_server_listen(http_server* server) {
     return HTTP_FAILURE;
   }
 
-  int retval = 0;
+  int retval = HTTP_SUCCESS;
   server->sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (server->sockfd < 0) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_listen] socket() failed - %d.\n", GET_ERROR());
@@ -152,7 +167,10 @@ int http_server_listen(http_server* server) {
             server->error_handler(&client->request, &client->response); 
           if (client->request.state == STATE_GOT_ALL)
             server->request_handler(&client->request, &client->response);
-          send_response(client);
+          if (http_send_response(client, &server->constraints) == HTTP_FAILURE) {
+            HTTP_LOG(HTTP_LOGERR, "[http_listen] http_send_response() failed.\n");
+            goto fail; 
+          }
         }
       }
     }
@@ -160,7 +178,7 @@ int http_server_listen(http_server* server) {
   
   goto cleanup;
  fail:
-  retval = 1;
+  retval = HTTP_FAILURE;
  cleanup: 
   CLOSE_SOCKET(server->sockfd);
   server->sockfd = -1;
@@ -179,7 +197,6 @@ int http_server_set_error_handler(http_server* server, request_handler error_han
 
 http_constraints http_make_default_constraints() {
   http_constraints constraints = {
-    .client_buffer_len = 1024;                  /* 1MB                */
     .request_max_body_len = 1024 * 1024 * 2;    /* 2MB                */
     .request_max_uri_len  = 2048;               /* 2KB: standard spec */
     .request_max_headers  = 24;                 /* arbitrary          */

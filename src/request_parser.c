@@ -2,9 +2,9 @@
 #include "client_info.h"
 #include "request_info.h"
 
-int parse_request(struct client_info* client) {
+int parse_request(struct client_info* client, http_constraints* constraints) {
   struct request_info* req = &client->request;
-  size_t  len = 0;
+  size_t len = 0;
   char* q = client->buffer;
   char* begin = q;
   char* end = q + client->bufflen;
@@ -48,7 +48,7 @@ int parse_request(struct client_info* client) {
       if (!q)
         return HTTP_FAILURE;
       *q = 0;
-      if ((len = strlen(begin)) > RESOURCE_BUFFLEN)
+      if ((len = strlen(begin)) > constraints->request_max_uri_len)
         return HTTP_FAILURE;
       if (strstr(begin, ".."))
         return HTTP_FAILURE;
@@ -84,15 +84,19 @@ int parse_request(struct client_info* client) {
         req->state = STATE_GOT_HEADERS;
         return HTTP_SUCCESS;
       }
+      if (req->headers->size > constraints->request_max_headers)
+        return HTTP_FAILURE;
 
+      size_t len = 0;
       begin = q;
       q = strchr(q, ':');
       if (!q)
         return HTTP_FAILURE;
       *q++ = 0;
+      len += strlen(begin);
       if (q >= end)
         return HTTP_FAILURE;
-
+      
       while (isspace(*q) && q < end) ++q;
       if (q >= end)
         return HTTP_FAILURE;
@@ -101,7 +105,10 @@ int parse_request(struct client_info* client) {
         return HTTP_FAILURE;
       *p = 0;
       if (strchr(begin, '\n') || strchr(begin, '\r'))
-        return HTTP_FAILURE; 
+        return HTTP_FAILURE;
+      len += strlen(begin);
+      if (len > constraints->request_max_header_len)
+        return HTTP_FAILURE;
       add_header_request_info(req, begin, q);
       q = p + 2;
     }
@@ -115,7 +122,7 @@ int parse_request(struct client_info* client) {
 
       if (req->body_termination == BODYTERMI_LENGTH) {
         size_t length = req->length;
-        if (req->length >= REQUEST_BODY_BUFFLEN)
+        if (req->length >= constraints->request_max_body_len)
           return HTTP_FAILURE;
         while (q < end && req->body_len < length) 
           req->body[req->body_len++] = *q++;
