@@ -75,29 +75,101 @@ int http_server_free(http_server* server) {
 int http_send_response(struct client_info* client, http_constraints* constraints) {
   http_response* res = client->response;
   http_request* req  = client->request;
-
   size_t sent = 0;
   size_t max_send = constraints->send_len;
   char* buffer = client->buffer;
   SOCKET sockfd = client->sockfd;
+  int ret = 0;
   while (sent < max_send) {
+    char* status_info = http_response_status_info(res->status);
+    if (status_info == NULL) {
+      HTTP_LOG(HTTP_LOGERR, "[http_send_response] invalid status code.\n");
+      return HTTP_FAILURE;
+    } 
     if (res->state == STATE_GOT_NOTHING) {
       snprintf(buffer, CLIENT_BUFFER_LEN, "%d %s %s\r\n",
                res->status,
-               http_response_status_info(res->status),
+               status_info,
                req->version == HTTP_VERSION_1_1 ? "HTTP/1.1" : "HTTP/1.0");
-      if ((sent = send(sockfd, buffer, strlen(buffer), 0)) == SOCKET_ERROR) {
+      if ((ret = send(sockfd, buffer, strlen(buffer), 0)) == SOCKET_ERROR) {
         HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
         return HTTP_FAILURE; 
       } 
-      res->state = STATE_GOT_LINE; 
+      res->state = STATE_GOT_LINE;
+      sent += ret;
     }
     else if (res->state == STATE_GOT_LINE) {
-      
+      http_hdk* key = res->current_key;
+      http_hdr* val = res->current_val;
+      if (res->send_key) {
+        if (key->len == res->sent) {
+          if (ret = send(sockfd, ": ", 2, 0) == SOCKET_FAILURE) {
+            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            return HTTP_FAILURE;
+          }
+          sent += ret;
+          res->sent = 0;
+          res->send_key = 0;
+        }
+        else {
+          if ((ret = send(sockfd, key->v + res->sent, MIN(max_send - sent, key->len - res->sent), 0)) == SOCKET_ERROR) {
+            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            return HTTP_FAILURE;
+          }
+          sent += ret;
+          res->sent += ret; 
+        }
+      }
+      else {
+        if (val->len == res->sent) {
+          if ((ret = send(sockfd, "\r\n", 2, 0)) == SOCKET_ERROR) {
+            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            return HTTP_FAILURE;
+          }
+          sent += ret; 
+          if (val->next)
+            res->current_val = val->next; 
+          else {
+            if (next_header(res->headers, &res->headers_iter, res->current_key, &res->current_val) == HTTP_FAILURE) {
+              if ((ret = send(sockfd, "\r\n", 2, 0)) == SOCKET_ERROR) {
+                HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+                return HTTP_FAILURE;
+              }
+              res->state = STATE_GOT_HEADERS; 
+            }
+          }
+          res->send_key = 1;
+          res->sent = 0;
+          
+        }
+        if ((ret = send(sockfd, val->v, MIN(max_send - sent, v->len - res->sent), 0)) == SOCKET_ERROR) {
+          HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+          return HTTP_FAILURE;
+        }
+        sent += ret;
+        res->sent += ret;
+      }
     }
-
     else if (res->state == STATE_GOT_HEADERS) {
-      fread();
+      if (res->body_type == BODYTYPE_STRING) {
+        if (res->string_len == res->sent) {
+          res->state = STATE_GOT_ALL; 
+          res->sent = 0;
+        }
+        if ((ret = send(sockfd, res->string + res->sent, MIN(max_send - sent, res->string_len - res->sent), 0)) == SOCKET_ERROR) {
+          HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+          return HTTP_FAILURE;
+        }
+        sent += ret;
+        res->sent += ret;
+      }
+      ret = fread(buffer, 1, CLIENT_BUFFER_LEN, res->file);
+      if ((res = (send(sockfd, buffer, res, 0)) == SOCKET_ERROR)) {
+        HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+        return HTTP_FAILURE;
+      }
+      sent += ret; 
+      res->sent += ret;
     }
   } 
   return HTTP_SUCCESS;
