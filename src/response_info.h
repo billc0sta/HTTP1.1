@@ -80,6 +80,11 @@ typedef struct {
 
   // internal use
   char state;
+  http_hdk current_key;
+  http_hdv* current_val;
+  size_t headers_iter;
+  size_t sent; 
+  int send_key; 
 } http_response;
 
 int http_response_make(http_response*);
@@ -88,5 +93,5 @@ int http_response_set_status(http_response*, int);
 int http_response_set_body(http_response*, const unsigned char*, size_t);
 int http_response_set_body_file(http_response*, const char* file_name); 
 int http_response_set_header(http_response*, const char*, const char*);
-int http_response_status_info(int);  
+const char* http_response_status_info(int);  
 #endif

@@ -73,15 +73,15 @@ int http_server_free(http_server* server) {
 }
 
 int http_send_response(struct client_info* client, http_constraints* constraints) {
-  http_response* res = client->response;
-  http_request* req  = client->request;
+  http_response* res = &client->response;
+  http_request* req  = &client->request;
   size_t sent = 0;
   size_t max_send = constraints->send_len;
   char* buffer = client->buffer;
   SOCKET sockfd = client->sockfd;
   int ret = 0;
   while (sent < max_send) {
-    char* status_info = http_response_status_info(res->status);
+    const char* status_info = http_response_status_info(res->status);
     if (status_info == NULL) {
       HTTP_LOG(HTTP_LOGERR, "[http_send_response] invalid status code.\n");
       return HTTP_FAILURE;
@@ -96,14 +96,16 @@ int http_send_response(struct client_info* client, http_constraints* constraints
         return HTTP_FAILURE; 
       } 
       res->state = STATE_GOT_LINE;
+      if (next_header(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE)
+        res->state = STATE_GOT_HEADERS;
       sent += ret;
     }
     else if (res->state == STATE_GOT_LINE) {
-      http_hdk* key = res->current_key;
-      http_hdr* val = res->current_val;
+      http_hdk* key = &res->current_key;
+      http_hdv* val = res->current_val;
       if (res->send_key) {
         if (key->len == res->sent) {
-          if (ret = send(sockfd, ": ", 2, 0) == SOCKET_FAILURE) {
+          if (ret = send(sockfd, ": ", 2, 0) == SOCKET_ERROR) {
             HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
           }
@@ -130,7 +132,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
           if (val->next)
             res->current_val = val->next; 
           else {
-            if (next_header(res->headers, &res->headers_iter, res->current_key, &res->current_val) == HTTP_FAILURE) {
+            if (next_header(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE) {
               if ((ret = send(sockfd, "\r\n", 2, 0)) == SOCKET_ERROR) {
                 HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
                 return HTTP_FAILURE;
@@ -142,7 +144,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
           res->sent = 0;
           
         }
-        if ((ret = send(sockfd, val->v, MIN(max_send - sent, v->len - res->sent), 0)) == SOCKET_ERROR) {
+        if ((ret = send(sockfd, val->v, MIN(max_send - sent, val->len - res->sent), 0)) == SOCKET_ERROR) {
           HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
           return HTTP_FAILURE;
         }
@@ -156,15 +158,15 @@ int http_send_response(struct client_info* client, http_constraints* constraints
           res->state = STATE_GOT_ALL; 
           res->sent = 0;
         }
-        if ((ret = send(sockfd, res->string + res->sent, MIN(max_send - sent, res->string_len - res->sent), 0)) == SOCKET_ERROR) {
+        if ((ret = send(sockfd, res->body_string + res->sent, MIN(max_send - sent, res->string_len - res->sent), 0)) == SOCKET_ERROR) {
           HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
           return HTTP_FAILURE;
         }
         sent += ret;
         res->sent += ret;
       }
-      ret = fread(buffer, 1, CLIENT_BUFFER_LEN, res->file);
-      if ((res = (send(sockfd, buffer, res, 0)) == SOCKET_ERROR)) {
+      ret = fread(buffer, 1, CLIENT_BUFFER_LEN, res->body_file);
+      if ((ret = (send(sockfd, buffer, ret, 0)) == SOCKET_ERROR)) {
         HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
         return HTTP_FAILURE;
       }
@@ -196,7 +198,7 @@ int http_server_listen(http_server* server) {
     goto fail; 
   }
   HTTP_LOG(HTTP_LOGOUT, "listening...");
-  struct client_group clients = make_client_group(); 
+  struct client_group clients = make_client_group(&server->constraints); 
   while (1) {
     fd_set read;
     if (ready_clients(&clients, server->sockfd, &read)) {
@@ -218,14 +220,16 @@ int http_server_listen(http_server* server) {
         goto fail;
       }
       HTTP_LOG(HTTP_LOGOUT, "accepted a client.\n");
+#ifdef HTTP_DEBUG
       print_client_address(client);
+#endif
     }
 	
     const size_t cap = clients.cap;
     for (size_t i = 0; i < cap; ++i) {
       struct client_info* client = &clients.data[i];
       if (FD_ISSET(client->sockfd, &read)) {
-        int res = recv(client->sockfd, client->buffer + client->bufflen, CLIENT_BUFFLEN - client->bufflen, 0);
+        int res = recv(client->sockfd, client->buffer + client->buff_len, CLIENT_BUFFER_LEN - client->buff_len, 0);
         if (res < 1) {
           HTTP_LOG(HTTP_LOGOUT, "client disconnected.\n");
 #ifdef HTTP_DEBUG
@@ -234,8 +238,8 @@ int http_server_listen(http_server* server) {
           drop_client(client);
         }
         else {
-          client->bufflen += res;
-          if (parse_request(client))
+          client->buff_len += res;
+          if (parse_request(client, &server->constraints) == HTTP_FAILURE)
             server->error_handler(&client->request, &client->response); 
           if (client->request.state == STATE_GOT_ALL)
             server->request_handler(&client->request, &client->response);
@@ -269,12 +273,12 @@ int http_server_set_error_handler(http_server* server, request_handler error_han
 
 http_constraints http_make_default_constraints() {
   http_constraints constraints = {
-    .request_max_body_len = 1024 * 1024 * 2;    /* 2MB                */
-    .request_max_uri_len  = 2048;               /* 2KB: standard spec */
-    .request_max_headers  = 24;                 /* arbitrary          */
-    .request_max_headers_len = 1024 * 1024 * 8; /* 8MB                */
-    .recv_len = 1024 * 1024;                    /* 1MB                */
-    .send_len = 1024 * 1024;                    /* 1MB                */
+    .request_max_body_len = 1024 * 1024 * 2,    /* 2MB                */
+    .request_max_uri_len  = 2048,               /* 2KB: standard spec */
+    .request_max_headers  = 24,                 /* arbitrary          */
+    .request_max_header_len = 1024 * 1024 * 8,  /* 8MB                */
+    .recv_len = 1024 * 1024,                    /* 1MB                */
+    .send_len = 1024 * 1024,                    /* 1MB                */
   };
   return constraints;
 }

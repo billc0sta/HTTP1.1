@@ -18,8 +18,8 @@ int reset_client_info(struct client_info* client) {
   client->sockfd = INVALID_SOCKET;
   client->buff_len = 0;
   client->used = 0;
-  reset_request_info(&client->request, client->sockfd, &client->addr);
-  make_response_info(&client->response);
+  http_request_reset(&client->request, client->sockfd, &client->addr);
+  http_response_make(&client->response);
   return HTTP_SUCCESS;
 }
 
@@ -69,8 +69,8 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
     client->sockfd = sockfd;
     client->used = 1;
     clients->len = counter;
-    make_request_info(&client->request, client->sockfd, &client->addr, clients->constraints);
-    make_response_info(&client->response); 
+    http_request_make(&client->request, client->sockfd, &client->addr, clients->constraints);
+    http_response_make(&client->response); 
     return client;
   }
 
@@ -86,7 +86,7 @@ int drop_client(struct client_info* client) {
 
   closesocket(client->sockfd);
   client->sockfd = 0;
-  client->bufflen = 0;
+  client->buff_len = 0;
   client->used = 0;
   return HTTP_SUCCESS;
 }
@@ -97,7 +97,7 @@ int free_client_info(struct client_info* client) {
     return HTTP_FAILURE;
   }
   reset_client_info(client);
-  free_request_info(&client->request);
+  http_request_free(&client->request);
   return HTTP_SUCCESS; 
 }
 
@@ -143,3 +143,16 @@ int ready_clients(struct client_group* clients, SOCKET server_sockfd, fd_set* re
   }
   return HTTP_SUCCESS;
 }
+
+#ifdef HTTP_DEBUG
+int print_client_address(struct client_info* client) {
+	if (!client) {
+		fprintf(stderr, "[print_client_address] passed NULL pointers for mandatory parameters.\n");
+		return 1;
+	}
+    char address[100];
+	getnameinfo((struct sockaddr*)&client->addr, client->addrlen, address, 100, NULL, 0, NI_NUMERICHOST);
+	printf("the client's address: %s", address);
+	return 0;
+}
+#endif

@@ -77,7 +77,7 @@ static struct bucket* headers_find(http_headers* map, const char* key)
 {
   unsigned int i = hashstring_murmur(key, strlen(key)) & (map->cap - 1);
   struct bucket* bucket;
-  while ((bucket = &map->buckets[i])->state != STATE_UNUSED && compare(key, bucket->key) != 0)
+  while ((bucket = &map->buckets[i])->state != STATE_UNUSED && compare(key, bucket->key.v) != 0)
     i = (i + 1) & (map->cap - 1);
 
   return bucket;
@@ -109,12 +109,12 @@ static int resize_headers(http_headers* map, size_t resize_by)
   for (int i = 0; i < old_cap; ++i) {
     struct bucket* curr = &old_buckets[i];
     if (curr->state == STATE_USED) {
-      struct bucket* bucket = headers_find(map, curr->key); // safe
+      struct bucket* bucket = headers_find(map, curr->key.v); // safe
       *bucket = *curr; 
     }
 
     else if (curr->state == STATE_DELETED) {
-      free(curr->key);
+      free(curr->key.v);
       http_hdv* prev = NULL;
       for (http_hdv* val = curr->val; val; val = val->next) {
         prev = val;
@@ -136,7 +136,7 @@ int set_header(http_headers* map, const char* key, const char* val) {
   struct bucket* deleted_bucket = NULL;
   struct bucket* bucket = NULL;
 
-  while ((bucket = &map->buckets[i])->state != STATE_UNUSED && compare(key, bucket->key) != 0) {
+  while ((bucket = &map->buckets[i])->state != STATE_UNUSED && compare(key, bucket->key.v) != 0) {
     if (bucket->state == STATE_DELETED)
       deleted_bucket = bucket;
     i = (i + 1) & (map->cap - 1);
@@ -160,18 +160,18 @@ int set_header(http_headers* map, const char* key, const char* val) {
   v->len = vallen;
   memcpy(v->v, val, vallen);
   if (bucket->state == STATE_UNUSED) {
-    bucket->key->v = (char*)malloc(keylen + 1);
-    if (!bucket->key->v) {
+    bucket->key.v = (char*)malloc(keylen + 1);
+    if (!bucket->key.v) {
       free(v);
       HTTP_LOG(HTTP_LOGERR, "[set_header] failed to allocate memory.\n");
       return HTTP_FAILURE;
     }
   }
   else	{
-    if (strlen(bucket->key) < keylen) {
-      free(bucket->key);
-      bucket->key->v = (char*)malloc(keylen + 1);
-      if (!bucket->key->v) {
+    if (bucket->key.len < keylen) {
+      free(bucket->key.v);
+      bucket->key.v = (char*)malloc(keylen + 1);
+      if (!bucket->key.v) {
         free(v);
         HTTP_LOG(HTTP_LOGERR, "[set_header] failed to allocate memory.\n");
         return HTTP_FAILURE;
@@ -183,9 +183,9 @@ int set_header(http_headers* map, const char* key, const char* val) {
       free(prev); // also deallocates the string
     }
   }
-  bucket->key->len       = keylen; 
-  bucket->key->v[keylen] = 0; 
-  memcpy(bucket->key->v, key, keylen);
+  bucket->key.len       = keylen; 
+  bucket->key.v[keylen] = 0; 
+  memcpy(bucket->key.v, key, keylen);
   bucket->state = STATE_USED;
   if (!bucket->val)
     bucket->val = v;
@@ -270,7 +270,7 @@ int reset_headers(http_headers* map)
   for (int i = 0; i < map->cap; ++i) {
     struct bucket* bucket = &map->buckets[i];
     if (bucket->state != STATE_UNUSED) {
-      free(bucket->key);
+      free(bucket->key.v);
       http_hdv* prev = NULL;
       for (http_hdv* val = bucket->val; val; val = val->next) {
         prev = val;

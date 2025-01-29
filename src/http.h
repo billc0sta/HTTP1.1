@@ -11,15 +11,15 @@ typedef struct {
   uint16_t    port;
   ipv4_t      ip;
   SOCKET      sockfd;
-  req_handler request_handler;
-  req_handler error_handler; 
+  request_handler request_handler;
+  request_handler error_handler; 
   struct client_group clients;
   http_constraints constraints;
 } http_server;
 
 int http_init(void);
 int http_quit(void);
-http_server* http_server_new(const char*, const char*, request_handler);
+http_server* http_server_new(const char*, const char*, request_handler, http_constraints*);
 int http_server_free(http_server*);
 int http_server_set_error_handler(http_server*, request_handler);
 int http_server_listen(http_server*);

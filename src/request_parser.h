@@ -4,5 +4,5 @@
 #include "client_info.h"
 #include "includes.h"
 
-int parse_request(struct client_info*);
+int parse_request(struct client_info*, http_constraints*);
 #endif

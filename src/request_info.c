@@ -7,20 +7,20 @@ int http_request_make(http_request* req, SOCKET client_socket, struct sockaddr_i
   }
 
   req->method = METHOD_NONE;
-  req->resource = malloc(constraints->request_max_uri_len + 1);
-  if (!req->resource) {
+  req->uri = malloc(constraints->request_max_uri_len + 1);
+  if (!req->uri) {
     HTTP_LOG(HTTP_LOGERR, "[make_request_info] malloc() failed.\n");
     return HTTP_FAILURE;
   }
   req->headers = make_headers(); 
   if (!req->headers) {
-    free(req->resource);
+    free(req->uri);
     HTTP_LOG(HTTP_LOGERR, "[make_request_info] make_headers() failed.\n");
     return HTTP_FAILURE;
   }
   req->body = malloc(constraints->request_max_body_len + 1);
   if (!req->body) {
-    free(req->resource);
+    free(req->uri);
     free_headers(req->headers);
     HTTP_LOG(HTTP_LOGERR, "[make_request_info] malloc() failed.\n");
     return HTTP_FAILURE;

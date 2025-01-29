@@ -40,7 +40,7 @@ typedef struct {
   size_t chunk; 
 } http_request;
 
-int http_request_make(http_request*, SOCKET, struct sockaddr_in*);
+int http_request_make(http_request*, SOCKET, struct sockaddr_in*, http_constraints*);
 int http_request_free(http_request*);
 int http_request_reset(http_request*, SOCKET, struct sockaddr_in*);
 int http_request_add_header(http_request*, const char*, const char*);

@@ -69,13 +69,17 @@ int http_response_make(http_response* res) {
     HTTP_LOG(HTTP_LOGERR, "[make_response_info] make_headers() failed.\n");
     return HTTP_FAILURE;
   }
-  res->version   = HTTP_VERSION_NONE;
-  res->status    = HTTP_STATUS_NONE;
-  res->body_string = NULL;
-  res->string_len  = 0;
-  res->body_type = BODYTYPE_NONE;
-  res->file_name = NULL;
-  res->state     = STATE_GOT_NOTHING;
+  res->version       = HTTP_VERSION_NONE;
+  res->status        = HTTP_STATUS_NONE;
+  res->body_string   = NULL;
+  res->string_len    = 0;
+  res->body_type     = BODYTYPE_NONE;
+  res->file_name     = NULL;
+  res->state         = STATE_GOT_NOTHING;
+  res->current_val   = NULL;
+  res->headers_iter  = 0;
+  res->sent          = 0; 
+  res->send_key      = 0;
   return HTTP_SUCCESS; 
 }
 
@@ -138,4 +142,12 @@ int http_response_set_header(http_response* res, const char* name, const char* v
     return HTTP_FAILURE;
   } 
   return HTTP_SUCCESS;
+}
+
+const char* http_response_status_info(int status_code) {
+  if (status_code < 0 || status_code >= HTTP_STATUS_NONE) {
+    HTTP_LOG(HTTP_STDERR, "[http_response_status_info] invalid status code.\n")
+    return NULL;
+  }
+  return status_string[status_code]; 
 }

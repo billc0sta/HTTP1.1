@@ -3,11 +3,11 @@
 #include "request_info.h"
 
 int parse_request(struct client_info* client, http_constraints* constraints) {
-  struct request_info* req = &client->request;
+  http_request* req = &client->request;
   size_t len = 0;
   char* q = client->buffer;
   char* begin = q;
-  char* end = q + client->bufflen;
+  char* end = q + client->buff_len;
   *end = 0;
   
   while (q < end && strstr(q, "\r\n")) {
@@ -52,9 +52,9 @@ int parse_request(struct client_info* client, http_constraints* constraints) {
         return HTTP_FAILURE;
       if (strstr(begin, ".."))
         return HTTP_FAILURE;
-      memcpy(req->resource, begin, len);
-      req->resource[len] = 0;
-      req->resource_len  = len;
+      memcpy(req->uri, begin, len);
+      req->uri[len] = 0;
+      req->uri_len  = len;
       
       ++q;
       begin = q;
@@ -84,7 +84,7 @@ int parse_request(struct client_info* client, http_constraints* constraints) {
         req->state = STATE_GOT_HEADERS;
         return HTTP_SUCCESS;
       }
-      if (req->headers->size > constraints->request_max_headers)
+      if (req->headers->len > constraints->request_max_headers)
         return HTTP_FAILURE;
 
       size_t len = 0;
@@ -109,7 +109,7 @@ int parse_request(struct client_info* client, http_constraints* constraints) {
       len += strlen(begin);
       if (len > constraints->request_max_header_len)
         return HTTP_FAILURE;
-      add_header_request_info(req, begin, q);
+      http_request_add_header(req, begin, q);
       q = p + 2;
     }
     
@@ -161,8 +161,8 @@ int parse_request(struct client_info* client, http_constraints* constraints) {
     }
   }
   
-  client->bufflen = MAX(0, client->bufflen - (q - client->buffer));
-  if (client->bufflen > 0)
-    memcpy(client->buffer, q, client->bufflen);
+  client->buff_len = MAX(0, client->buff_len - (q - client->buffer));
+  if (client->buff_len > 0)
+    memcpy(client->buffer, q, client->buff_len);
   return HTTP_SUCCESS;
 }
