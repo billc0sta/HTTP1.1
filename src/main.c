@@ -17,18 +17,16 @@ void handler(http_request* request, http_response* response) {
 }
 
 int main() {
-  if (http_init()) {
-    fprintf(stderr, "[main] http_init() failed.\n");
-    exit(1); 
+  if (http_init() != HTTP_SUCCESS) {
+    return 1;
   }
   
   http_server* server = http_server_new("0.0.0.0", "80", handler, NULL);
-  if (!server) {
-    fprintf(stderr, "[main] http_server_new() failed.\n");
+  if (http_server) {
+    http_server_listen(server); 
+    http_server_free();
   }
-  http_server_listen(server);
-  
-  http_server_free(server);
+
   http_quit();
   return 0;
 }
