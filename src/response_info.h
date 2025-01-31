@@ -69,13 +69,11 @@ enum {
 };
 
 typedef struct {
-  int version;
   int status;
   http_headers* headers;
   const unsigned char* body_string;
   size_t string_len;
   FILE* body_file;
-  const char* file_name;
   int body_type;
 
   // internal use
@@ -84,14 +82,16 @@ typedef struct {
   http_hdv* current_val;
   size_t headers_iter;
   size_t sent; 
-  int send_key; 
+  int send_key;
+  http_constraints* constraints; 
 } http_response;
 
-int http_response_make(http_response*);
-int http_response_set_version(http_response*, int);
+int http_response_make(http_response*, http_constraints*);
 int http_response_set_status(http_response*, int);
 int http_response_set_body(http_response*, const unsigned char*, size_t);
-int http_response_set_body_file(http_response*, const char* file_name); 
+int http_response_set_body_file(http_response*, char* file_name); 
 int http_response_set_header(http_response*, const char*, const char*);
-const char* http_response_status_info(int);  
+const char* http_response_status_string(int);
+int http_response_status_code(int);
+int http_response_reset(http_response*);
 #endif

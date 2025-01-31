@@ -74,4 +74,5 @@ int http_request_add_header(http_request* req, const char* header, const char* v
     return HTTP_FAILURE;
   }
   set_header(req->headers, header, value);
+  return HTTP_SUCCESS;
 }

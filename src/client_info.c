@@ -9,7 +9,7 @@ struct client_group make_client_group(http_constraints* constraints) {
   return clients;
 }
 
-int reset_client_info(struct client_info* client) {
+int reset_client_info(struct client_info* client, http_constraints* constraints) {
   if (!client) {
     HTTP_LOG(HTTP_LOGERR, "[reset_client_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
@@ -19,7 +19,7 @@ int reset_client_info(struct client_info* client) {
   client->buff_len = 0;
   client->used = 0;
   http_request_reset(&client->request, client->sockfd, &client->addr);
-  http_response_make(&client->response);
+  http_response_make(&client->response, constraints);
   return HTTP_SUCCESS;
 }
 
@@ -39,7 +39,7 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
         client->addr = *addr;
         client->sockfd = sockfd;
         client->used = 1;
-        reset_client_info(client);
+        reset_client_info(client, clients->constraints);
         ++clients->len;
         return client;
       }
@@ -70,7 +70,7 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
     client->used = 1;
     clients->len = counter;
     http_request_make(&client->request, client->sockfd, &client->addr, clients->constraints);
-    http_response_make(&client->response); 
+    http_response_make(&client->response, clients->constraints); 
     return client;
   }
 
@@ -96,7 +96,6 @@ int free_client_info(struct client_info* client) {
     HTTP_LOG(HTTP_LOGERR, "[free_client_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  reset_client_info(client);
   http_request_free(&client->request);
   return HTTP_SUCCESS; 
 }

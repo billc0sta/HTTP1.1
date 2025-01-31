@@ -1,3 +1,7 @@
+#ifdef _DEBUG
+#define HTTP_DEBUG 1
+#endif
+
 #include "http.h"
 
 static int dump_headers(http_headers* headers) {
@@ -13,7 +17,8 @@ static int dump_headers(http_headers* headers) {
 }
 
 void handler(http_request* request, http_response* response) {
-  dump_headers(request->headers);
+  http_response_set_status(response, HTTP_STATUS_200);
+  http_response_set_body(response, "Hello from Kudos.", 17);
 }
 
 int main() {
@@ -22,11 +27,12 @@ int main() {
   }
   
   http_server* server = http_server_new("0.0.0.0", "80", handler, NULL);
-  if (http_server) {
+  if (server) {
     http_server_listen(server); 
-    http_server_free();
+    http_server_free(server);
   }
 
   http_quit();
+
   return 0;
 }

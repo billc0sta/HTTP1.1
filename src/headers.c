@@ -115,10 +115,12 @@ static int resize_headers(http_headers* map, size_t resize_by)
 
     else if (curr->state == STATE_DELETED) {
       free(curr->key.v);
-      http_hdv* prev = NULL;
-      for (http_hdv* val = curr->val; val; val = val->next) {
-        prev = val;
-        free(prev);
+      http_hdv* val  = curr->val;
+      http_hdv* next = NULL;
+      while(val) {
+        next = val->next;
+        free(val);
+        val = next;
       }
     }
   }
@@ -147,8 +149,8 @@ int set_header(http_headers* map, const char* key, const char* val) {
     bucket = deleted_bucket;
   }
 
-  int keylen = (int)strlen(key);
-  int vallen = (int)strlen(val);
+  size_t keylen = strlen(key);
+  size_t vallen = strlen(val);
   http_hdv* v = (http_hdv*)malloc(sizeof(http_hdv) + vallen + 1);
   if (!v) {
     HTTP_LOG(HTTP_LOGERR, "[set_header] failed to allocate memory.\n");
@@ -177,10 +179,14 @@ int set_header(http_headers* map, const char* key, const char* val) {
         return HTTP_FAILURE;
       }
     }
-    http_hdv* prev = NULL;
-    for (http_hdv* val = bucket->val; val; val = val->next) {
-      prev = val;
-      free(prev); // also deallocates the string
+    if (bucket->state == STATE_DELETED) {
+      http_hdv* valhdv = bucket->val;
+      http_hdv* next = NULL;
+      while (valhdv) {
+        next = valhdv->next;
+        free(valhdv); // also deallocates the string
+        valhdv = next;
+      }
     }
   }
   bucket->key.len       = keylen; 
@@ -206,7 +212,7 @@ int set_header(http_headers* map, const char* key, const char* val) {
 
 http_hdv* get_header(http_headers* map, const char* key)
 {
-  if (!map || key) {
+  if (!map || !key) {
     HTTP_LOG(HTTP_LOGERR, "[get_header] passed NULL pointers for mandatory parameters.\n");
     return NULL;
   } 
@@ -269,15 +275,8 @@ int reset_headers(http_headers* map)
   }
   for (int i = 0; i < map->cap; ++i) {
     struct bucket* bucket = &map->buckets[i];
-    if (bucket->state != STATE_UNUSED) {
-      free(bucket->key.v);
-      http_hdv* prev = NULL;
-      for (http_hdv* val = bucket->val; val; val = val->next) {
-        prev = val;
-        free(prev);
-      }
-      bucket->state = STATE_UNUSED;
-    }
+    if (bucket->state != STATE_UNUSED)
+      bucket->state = STATE_DELETED;
   }
   map->len = 0;
   return HTTP_SUCCESS;

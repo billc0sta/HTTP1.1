@@ -40,10 +40,10 @@ enum {
 
 #ifdef HTTP_DEBUG
 
-static int HTTP_LOG(int fd, const char* format, ...) {
+static int HTTP_LOG(FILE* file, const char* format, ...) {
   va_list args;
   va_start(args, format);
-  int res = vfprintf(fd, format, args);
+  int res = vfprintf(file, format, args);
   va_end(args);
   return res; 
 }
@@ -69,7 +69,8 @@ typedef struct {
   size_t request_max_headers;
   size_t request_max_header_len;
   size_t recv_len;
-  size_t send_len; 
+  size_t send_len;
+  const char* public_folder; 
 } http_constraints;
 
 enum {

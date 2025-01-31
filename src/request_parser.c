@@ -82,40 +82,41 @@ int parse_request(struct client_info* client, http_constraints* constraints) {
     else if (req->state == STATE_GOT_LINE) {
       if (q < end && memcmp(q, "\r\n", 2) == 0) {
         req->state = STATE_GOT_HEADERS;
-        return HTTP_SUCCESS;
       }
-      if (req->headers->len > constraints->request_max_headers)
-        return HTTP_FAILURE;
+      else {
+        if (req->headers->len == constraints->request_max_headers)
+          return HTTP_FAILURE;
 
-      size_t len = 0;
-      begin = q;
-      q = strchr(q, ':');
-      if (!q)
-        return HTTP_FAILURE;
-      *q++ = 0;
-      len += strlen(begin);
-      if (q >= end)
-        return HTTP_FAILURE;
-      
-      while (isspace(*q) && q < end) ++q;
-      if (q >= end)
-        return HTTP_FAILURE;
-      char* p = strstr(q, "\r\n");
-      if (!p)
-        return HTTP_FAILURE;
-      *p = 0;
-      if (strchr(begin, '\n') || strchr(begin, '\r'))
-        return HTTP_FAILURE;
-      len += strlen(begin);
-      if (len > constraints->request_max_header_len)
-        return HTTP_FAILURE;
-      http_request_add_header(req, begin, q);
-      q = p + 2;
+        size_t len = 0;
+        begin = q;
+        q = strchr(q, ':');
+        if (!q)
+          return HTTP_FAILURE;
+        *q++ = 0;
+        len += strlen(begin);
+        if (q >= end)
+          return HTTP_FAILURE;
+
+        while (isspace(*q) && q < end) ++q;
+        if (q >= end)
+          return HTTP_FAILURE;
+        char* p = strstr(q, "\r\n");
+        if (!p)
+          return HTTP_FAILURE;
+        *p = 0;
+        if (strchr(begin, '\n') || strchr(begin, '\r'))
+          return HTTP_FAILURE;
+        len += strlen(begin);
+        if (len > constraints->request_max_header_len)
+          return HTTP_FAILURE;
+        http_request_add_header(req, begin, q);
+        q = p + 2;
+      }
     }
     
     else if (req->state == STATE_GOT_HEADERS) {
       int method = req->method;
-      if (method != METHOD_POST || method != METHOD_PUT || method != METHOD_PATCH) {
+      if (method != METHOD_POST && method != METHOD_PUT && method != METHOD_PATCH) {
         req->state = STATE_GOT_ALL;
         return HTTP_SUCCESS; 
       }

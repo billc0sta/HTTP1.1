@@ -28,7 +28,7 @@ int drop_client(struct client_info*);
 struct client_group make_client_group(http_constraints*);
 int free_clients_group(struct client_group*);
 int ready_clients(struct client_group*, SOCKET, fd_set*);
-int reset_client_info(struct client_info*);
+int reset_client_info(struct client_info*, http_constraints*);
 int print_client_address(struct client_info*);
 
 #endif
