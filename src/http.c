@@ -268,6 +268,7 @@ int http_server_listen(http_server* server) {
         if (client->response.state == STATE_GOT_ALL) {
             http_request_reset(&client->request, client->sockfd, &client->addr);
             http_response_reset(&client->response);
+            client->buff_len = 0;
         }
       }
       else if (FD_ISSET(client->sockfd, &read)) {

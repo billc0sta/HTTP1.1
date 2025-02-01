@@ -26,7 +26,7 @@ int main() {
     return 1;
   }
   
-  http_server* server = http_server_new("0.0.0.0", "8080", handler, NULL);
+  http_server* server = http_server_new("0.0.0.0", "7432", handler, NULL);
   if (server) {
     http_server_listen(server); 
     http_server_free(server);

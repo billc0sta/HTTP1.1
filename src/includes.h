@@ -31,6 +31,7 @@ enum {
 #include <sys/select.h>
 #include <netdb.h>
 #include <errno.h>
+#include <unistd.h>
 #define SOCKET int
 #define CLOSE_SOCKET(s) close(s)
 #define GET_ERROR() errno

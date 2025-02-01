@@ -18,14 +18,24 @@ int reset_client_info(struct client_info* client, http_constraints* constraints)
   client->sockfd = INVALID_SOCKET;
   client->buff_len = 0;
   client->used = 0;
-  if (client->request.headers)
-    http_request_reset(&client->request, client->sockfd, &client->addr);
-  else
-    http_request_make(&client->request, client->sockfd, &client->addr, constraints); 
-  if (client->response.headers)
-    http_response_reset(&client->response);
-  else
-    http_response_make(&client->response, constraints);
+  if (client->request.headers) {
+      http_request_reset(&client->request, client->sockfd, &client->addr);
+  }
+  else {
+      if (http_request_make(&client->request, client->sockfd, &client->addr, constraints) == HTTP_FAILURE) {
+          HTTP_LOG(HTTP_LOGERR, "[reset_client_info] http_request_make failed.\n");
+          return HTTP_FAILURE;
+      }
+  }
+  if (client->response.headers) {
+      http_response_reset(&client->response);
+  }
+  else {
+      if (http_response_make(&client->response, constraints) == HTTP_FAILURE) {
+          HTTP_LOG(HTTP_LOGERR, "[reset_client_info] http_response_make failed.\n");
+          return HTTP_FAILURE;
+      }
+  }
   return HTTP_SUCCESS;
 }
 
@@ -42,10 +52,10 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
     for (size_t i = 0; i < cap; ++i) {
       if (data[i].used == 0) {
         struct client_info* client = &data[i];
+        reset_client_info(client, clients->constraints);
         client->addr = *addr;
         client->sockfd = sockfd;
         client->used = 1;
-        reset_client_info(client, clients->constraints);
         ++clients->len;
         return client;
       }
@@ -75,8 +85,14 @@ struct client_info* add_client(struct client_group* clients, SOCKET sockfd, stru
     client->sockfd = sockfd;
     client->used = 1;
     clients->len = counter;
-    http_request_make(&client->request, client->sockfd, &client->addr, clients->constraints);
-    http_response_make(&client->response, clients->constraints); 
+    if (http_request_make(&client->request, client->sockfd, &client->addr, clients->constraints) == HTTP_FAILURE) {
+      HTTP_LOG(HTTP_LOGERR, "[add_client] http_request_make failed.\n");
+      return HTTP_FAILURE;
+    }
+    if (http_response_make(&client->response, clients->constraints) == HTTP_FAILURE) {
+      HTTP_LOG(HTTP_LOGERR, "[add_client] http_response_make failed.\n");
+      return HTTP_FAILURE;
+    }
     return client;
   }
 
@@ -102,7 +118,8 @@ int free_client_info(struct client_info* client) {
     HTTP_LOG(HTTP_LOGERR, "[free_client_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  http_request_free(&client->request);
+  if (client->request.headers)
+    http_request_free(&client->request);
   return HTTP_SUCCESS; 
 }
 

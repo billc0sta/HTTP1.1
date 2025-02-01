@@ -187,6 +187,7 @@ int set_header(http_headers* map, const char* key, const char* val) {
         free(valhdv); // also deallocates the string
         valhdv = next;
       }
+      bucket->val = NULL; 
     }
   }
   bucket->key.len       = keylen; 
