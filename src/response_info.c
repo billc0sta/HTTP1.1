@@ -175,15 +175,15 @@ int http_response_set_header(http_response* res, const char* name, const char* v
 
 int http_response_status_code(int status) {
   if (status < 0 || status >= HTTP_STATUS_NONE) {
-    HTTP_LOG(HTTP_STDERR, "[http_response_status_info] invalid status code.\n")
-      return 0;
+    HTTP_LOG(HTTP_LOGERR, "[http_response_status_info] invalid status code.\n");
+    return 0;
   }
   return status_info[status].code;
 }
 
 const char* http_response_status_string(int status) {
   if (status < 0 || status >= HTTP_STATUS_NONE) {
-    HTTP_LOG(HTTP_STDERR, "[http_response_status_info] invalid status code.\n")
+    HTTP_LOG(HTTP_LOGERR, "[http_response_status_info] invalid status code.\n"); 
     return NULL;
   }
   return status_info[status].string; 

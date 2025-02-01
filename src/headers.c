@@ -43,7 +43,7 @@ static unsigned int hashstring_murmur(const char* key, size_t size)
     k |= tolower(*key++) & 0xff;
     k |= ((tolower(*key++) & 0xff) << 8);
     k |= ((tolower(*key++) & 0xff) << 16);
-    k |= ((tolower(*key++) & 0xff) << 24);
+    k |= (((unsigned)tolower(*key++) & 0xff) << 24);
     h ^= murmur_scramble(k);
     h = (h << 13) | (h >> 19);
     h = h * 5 + 0xe6546b64;

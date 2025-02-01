@@ -23,7 +23,7 @@ int http_quit(void) {
 }
 
 void http_default_error_handler(http_request* req, http_response* res) {
-  http_response_set_status(res, 400);
+  http_response_set_status(res, HTTP_STATUS_400);
 }
 
 http_server* http_server_new(const char* ip, const char* port, request_handler request_handler, http_constraints* constraints) {
@@ -95,7 +95,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
                status_code,
                status_string);
       if ((ret = send(sockfd, buffer, (int)strlen(buffer), 0)) == SOCKET_ERROR) {
-        HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+        HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
         return HTTP_FAILURE; 
       } 
       res->state = STATE_GOT_LINE;
@@ -109,7 +109,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
       if (res->send_key) {
         if (key->len == res->sent) {
           if (ret = send(sockfd, ": ", 2, 0) == SOCKET_ERROR) {
-            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
           }
           sent += ret;
@@ -118,7 +118,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
         }
         else {
           if ((ret = send(sockfd, key->v + res->sent, (int)MIN(max_send - sent, key->len - res->sent), 0)) == SOCKET_ERROR) {
-            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
           }
           sent += ret;
@@ -128,7 +128,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
       else {
         if (val->len == res->sent) {
           if ((ret = send(sockfd, "\r\n", 2, 0)) == SOCKET_ERROR) {
-            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
           }
           sent += ret; 
@@ -137,7 +137,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
           else {
             if (next_header(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE) {
               if ((ret = send(sockfd, "\r\n", 2, 0)) == SOCKET_ERROR) {
-                HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+                HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
                 return HTTP_FAILURE;
               }
               res->state = STATE_GOT_HEADERS; 
@@ -148,7 +148,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
         }
         else {
           if ((ret = send(sockfd, val->v + res->sent, (int)MIN(max_send - sent, val->len - res->sent), 0)) == SOCKET_ERROR) {
-            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
           }
           sent += ret;
@@ -164,7 +164,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
           }
           else {
           if ((ret = send(sockfd, res->body_string + res->sent, (int)MIN(max_send - sent, res->string_len - res->sent), 0)) == SOCKET_ERROR) {
-            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
           }
           sent += ret;
@@ -183,21 +183,21 @@ int http_send_response(struct client_info* client, http_constraints* constraints
         else 
             snprintf(hex, 20, "%.x\r\n", ret2);
         if ((ret = send(sockfd, hex, (int)strlen(hex), 0)) == SOCKET_ERROR) {
-            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
         }
         sent += ret;
         res->sent += ret;
         if (ret2 > 0) {
           if ((ret = send(sockfd, buffer, ret2, 0)) == SOCKET_ERROR) {
-            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
           }
           sent += ret2;
           res->sent += ret2;
         }
         if ((ret = send(sockfd, "\r\n", 2, 0)) == SOCKET_ERROR) {
-            HTTP_LOG(HTTP_STDERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
+            HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
         }
         sent += 2;
@@ -228,11 +228,11 @@ int http_server_listen(http_server* server) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_listen] listen() failed - %d.\n", GET_ERROR());
     goto fail; 
   }
-  HTTP_LOG(HTTP_LOGOUT, "listening...");
+  HTTP_LOG(HTTP_LOGOUT, "listening...\n");
   struct client_group* clients = &server->clients; 
   while (1) {
     fd_set read;
-    if (ready_clients(clients, server->sockfd, &read)) {
+    if (ready_clients(clients, server->sockfd, &read) == HTTP_FAILURE) {
       HTTP_LOG(HTTP_LOGERR, "[http_server_listen] ready_clients() failed.\n");
       goto fail; 
     }
@@ -259,6 +259,7 @@ int http_server_listen(http_server* server) {
     const size_t cap = clients->cap;
     for (size_t i = 0; i < cap; ++i) {
       struct client_info* client = &clients->data[i];
+      if (client->used == 0) continue; 
       if (client->request.state == STATE_GOT_ALL) {
         if (http_send_response(client, &server->constraints) == HTTP_FAILURE) {
           HTTP_LOG(HTTP_LOGERR, "[http_listen] http_send_response() failed.\n");
@@ -271,19 +272,26 @@ int http_server_listen(http_server* server) {
       }
       else if (FD_ISSET(client->sockfd, &read)) {
         int res = recv(client->sockfd, client->buffer + client->buff_len, (int)(CLIENT_BUFFER_LEN - client->buff_len), 0);
-        if (res < 1) {
-          HTTP_LOG(HTTP_LOGOUT, "client disconnected.\n");
+        if (res < 0) {
+          HTTP_LOG(HTTP_LOGOUT, "client disconnected disgracefully.\n");
 #ifdef HTTP_DEBUG
           print_client_address(client);
 #endif
           drop_client(client);
         }
-        else {
+        else if (res > 0) {
           client->buff_len += res;
           if (parse_request(client, &server->constraints) == HTTP_FAILURE)
             server->error_handler(&client->request, &client->response); 
           if (client->request.state == STATE_GOT_ALL)
             server->request_handler(&client->request, &client->response);
+        }
+        else {
+          HTTP_LOG(HTTP_LOGOUT, "client disconnected gracefully.\n");
+#ifdef HTTP_DEBUG
+          print_client_address(client);
+#endif
+          drop_client(client);
         }
       }
     }

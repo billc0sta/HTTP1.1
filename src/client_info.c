@@ -18,8 +18,14 @@ int reset_client_info(struct client_info* client, http_constraints* constraints)
   client->sockfd = INVALID_SOCKET;
   client->buff_len = 0;
   client->used = 0;
-  http_request_reset(&client->request, client->sockfd, &client->addr);
-  http_response_make(&client->response, constraints);
+  if (client->request.headers)
+    http_request_reset(&client->request, client->sockfd, &client->addr);
+  else
+    http_request_make(&client->request, client->sockfd, &client->addr, constraints); 
+  if (client->response.headers)
+    http_response_reset(&client->response);
+  else
+    http_response_make(&client->response, constraints);
   return HTTP_SUCCESS;
 }
 
@@ -125,18 +131,23 @@ int ready_clients(struct client_group* clients, SOCKET server_sockfd, fd_set* re
   const struct client_info* data = clients->data;
   FD_ZERO(read);
   FD_SET(server_sockfd, read); 
+  fd_set wr;
+  FD_ZERO(&wr);
   int max_socket = (int)server_sockfd;
   for (size_t i = 0; i < cap; ++i) {
     if (data[i].used == 1) {
       SOCKET sockfd = data[i].sockfd;
-      FD_SET(sockfd, read);
+      if (data[i].request.state == STATE_GOT_NOTHING)
+        FD_SET(sockfd, read);
+      else
+        FD_SET(sockfd, &wr); 
       if (sockfd > max_socket) max_socket = (int)sockfd;
     }
   }
   struct timeval timeout;
   timeout.tv_sec = SELECT_SEC;
   timeout.tv_usec = SELECT_USEC;
-  if (select(max_socket + 1, read, NULL, NULL, &timeout) < 0) {
+  if (select(max_socket + 1, read, &wr, NULL, &timeout) < 0) {
     HTTP_LOG(HTTP_LOGERR, "[ready_clients] select() failed - %d.\n", GET_ERROR());
     return HTTP_FAILURE;
   }
@@ -147,11 +158,11 @@ int ready_clients(struct client_group* clients, SOCKET server_sockfd, fd_set* re
 int print_client_address(struct client_info* client) {
 	if (!client) {
 		fprintf(stderr, "[print_client_address] passed NULL pointers for mandatory parameters.\n");
-		return 1;
+		return HTTP_FAILURE;
 	}
     char address[100];
-	getnameinfo((struct sockaddr*)&client->addr, client->addrlen, address, 100, NULL, 0, NI_NUMERICHOST);
-	printf("the client's address: %s", address);
-	return 0;
+	getnameinfo((struct sockaddr*)&client->addr, sizeof(client->addr), address, 100, NULL, 0, NI_NUMERICHOST);
+	printf("the client's address: %s\n", address);
+	return HTTP_SUCCESS;
 }
 #endif

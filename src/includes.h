@@ -38,6 +38,7 @@ enum {
 #define SOCKET_ERROR -1
 #endif
 
+#define HTTP_DEBUG 
 #ifdef HTTP_DEBUG
 
 static int HTTP_LOG(FILE* file, const char* format, ...) {
