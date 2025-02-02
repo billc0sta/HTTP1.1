@@ -1,9 +1,10 @@
 #ifndef HTTP_H_
 #define HTTP_H_ 
 #include "includes.h"
-#include "client_info.h" 
-#include "request_info.h"
-#include "headers.h"
+#include "conn_info.h" 
+#include "http_request.h"
+#include "http_response.h"
+#include "http_headers.h"
 typedef void (*request_handler) (http_request*, http_response*);
 
 typedef struct {
@@ -13,7 +14,7 @@ typedef struct {
   SOCKET      sockfd;
   request_handler request_handler;
   request_handler error_handler; 
-  struct client_group clients;
+  struct conn_group conns;
   http_constraints constraints;
 } http_server;
 

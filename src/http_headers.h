@@ -25,12 +25,12 @@ typedef struct {
   struct bucket* buckets;
 } http_headers;
 
-http_headers* make_headers(void);
-int set_header(http_headers*, const char*, const char*);
-http_hdv* get_header(http_headers*, const char*);
-int remove_header(http_headers*, const char*);
-int next_header(http_headers*, size_t*, http_hdk*, http_hdv**);
-int reset_headers(http_headers*);
-int free_headers(http_headers*);
+http_headers* http_headers_make(void);
+int http_header_set(http_headers*, const char*, const char*);
+http_hdv* http_header_get(http_headers*, const char*);
+int http_header_remove(http_headers*, const char*);
+int http_header_next(http_headers*, size_t*, http_hdk*, http_hdv**);
+int http_header_reset(http_headers*);
+int http_header_free(http_headers*);
 
 #endif

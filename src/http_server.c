@@ -1,12 +1,12 @@
-#include "http.h" 
-#include "client_info.h"
-#include "request_parser.h"
+#include "http_server.h" 
+#include "conn_info.h"
+#include "parser.h"
 
 int http_init(void) {
 #ifdef _WIN32
   WSADATA data;
-  int res;
-  if (res = WSAStartup(MAKEWORD(2, 2), &data)) {
+  int res = WSAStartup(MAKEWORD(2, 2), &data);
+  if (res) {
     HTTP_LOG(HTTP_LOGERR, "[http_init] WSAStartup() failed - %d.\n", res);
     return HTTP_FAILURE;
   }
@@ -57,7 +57,7 @@ http_server* http_server_new(const char* ip, const char* port, request_handler r
   server->error_handler   = http_default_error_handler; 
   server->addr            = *(struct sockaddr_in*)binder->ai_addr;
   server->constraints     = constraints ? *constraints : http_make_default_constraints();
-  server->clients         = make_client_group(&server->constraints); 
+  server->conns           = conn_group_make(&server->constraints); 
   freeaddrinfo(binder);
   return server;
 }
@@ -68,18 +68,18 @@ int http_server_free(http_server* server) {
     return HTTP_FAILURE;
   }
 
-  free_clients_group(&server->clients); 
+  conn_group_free(&server->conns); 
   free(server);
   return HTTP_SUCCESS;
 }
 
-int http_send_response(struct client_info* client, http_constraints* constraints) {
-  http_response* res = &client->response;
-  http_request* req  = &client->request;
+int http_send_response(struct conn_info* conn, http_constraints* constraints) {
+  http_response* res = &conn->response;
+  http_request* req  = &conn->request;
   size_t sent = 0;
   size_t max_send = constraints->send_len;
-  char* buffer = client->buffer;
-  SOCKET sockfd = client->sockfd;
+  char* buffer = conn->buffer;
+  SOCKET sockfd = conn->sockfd;
   int ret = 0;
   char hex[20]; 
   while (sent < max_send && res->state != STATE_GOT_ALL) {
@@ -90,7 +90,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
           HTTP_LOG(HTTP_LOGERR, "[http_send_response] invalid status code.\n");
           return HTTP_FAILURE;
         }
-      snprintf(buffer, CLIENT_BUFFER_LEN, "%s %d %s\r\n",
+      snprintf(buffer, CONN_BUFF_LEN, "%s %d %s\r\n",
                req->version == HTTP_VERSION_1_1 ? "HTTP/1.1" : "HTTP/1.0",
                status_code,
                status_string);
@@ -99,7 +99,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
         return HTTP_FAILURE; 
       } 
       res->state = STATE_GOT_LINE;
-      if (next_header(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE)
+      if (http_header_next(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE)
         res->state = STATE_GOT_HEADERS;
       sent += ret;
     }
@@ -108,7 +108,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
       http_hdv* val = res->current_val;
       if (res->send_key) {
         if (key->len == res->sent) {
-          if (ret = send(sockfd, ": ", 2, 0) == SOCKET_ERROR) {
+          if ((ret = send(sockfd, ": ", 2, 0)) == SOCKET_ERROR) {
             HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
           }
@@ -135,7 +135,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
           if (val->next)
             res->current_val = val->next; 
           else {
-            if (next_header(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE) {
+            if (http_header_next(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE) {
               if ((ret = send(sockfd, "\r\n", 2, 0)) == SOCKET_ERROR) {
                 HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
                 return HTTP_FAILURE;
@@ -158,12 +158,12 @@ int http_send_response(struct client_info* client, http_constraints* constraints
     }
     else if (res->state == STATE_GOT_HEADERS) {
         if (res->body_type == BODYTYPE_STRING) {
-          if (res->string_len == res->sent) {
+          if (res->body_len == res->sent) {
             res->state = STATE_GOT_ALL;
             res->sent = 0;
           }
           else {
-          if ((ret = send(sockfd, res->body_string + res->sent, (int)MIN(max_send - sent, res->string_len - res->sent), 0)) == SOCKET_ERROR) {
+          if ((ret = send(sockfd, res->body_string + res->sent, (int)MIN(max_send - sent, res->body_len - res->sent), 0)) == SOCKET_ERROR) {
             HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
             return HTTP_FAILURE;
           }
@@ -173,7 +173,7 @@ int http_send_response(struct client_info* client, http_constraints* constraints
       }
       else {    
         int ret2;
-        ret2 = (int)fread(buffer, 1, CLIENT_BUFFER_LEN, res->body_file);
+        ret2 = (int)fread(buffer, 1, CONN_BUFF_LEN, res->body_file);
         ret = ret2;
         buffer[ret2] = 0; 
         if (ret2 == 0) {
@@ -208,6 +208,39 @@ int http_send_response(struct client_info* client, http_constraints* constraints
   return HTTP_SUCCESS;
 }
 
+int http_validate_response(http_response* res) {
+  if (res->status < 0 || res->status >= HTTP_STATUS_NONE) {
+    HTTP_LOG(HTTP_LOGERR, "[http_validate_response] invalid status code - response handler is not set correctly.\n");
+    return HTTP_FAILURE;
+  }
+
+  http_headers* headers = res->headers;
+  http_hdv* length = http_header_get(headers, "Content-Length");
+  http_hdv* tren = http_header_get(headers, "Transfer-Encoding");
+  if (length) {
+    if (tren) {
+      HTTP_LOG(HTTP_LOGERR, "[http_validate_response] invalid headers - both 'Content-Length' and 'Transfer-Encoding' are set.\n");
+      return HTTP_FAILURE;
+    }
+    size_t len = strtoul(length, 0, 10);
+    if (len == 0) {
+      HTTP_LOG(HTTP_LOGERR, "[http_validate_response] invalid headers - 'Content-Length' is set to 0 or non-number.\n");
+      return HTTP_FAILURE;
+    }
+    if (res->body_len != 0 && len > res->body_len) {
+      HTTP_LOG(HTTP_LOGERR, "[http_validate_response] invalid headers - 'Content-Length' > body_len");
+      return HTTP_FAILURE;
+    } 
+    res->body_len = len;
+    res->body_termination = BODYTERMI_LENGTH;
+  }
+  else {
+
+  }
+
+  return HTTP_SUCCESS;
+}
+
 int http_server_listen(http_server* server) {
   if (!server) {
     HTTP_LOG(HTTP_LOGERR, "[http_server_listen] passed NULL pointers for mandatory parameters");
@@ -229,70 +262,81 @@ int http_server_listen(http_server* server) {
     goto fail; 
   }
   HTTP_LOG(HTTP_LOGOUT, "listening...\n");
-  struct client_group* clients = &server->clients; 
+  struct conn_group* conns = &server->conns; 
   while (1) {
     fd_set read;
-    if (ready_clients(clients, server->sockfd, &read) == HTTP_FAILURE) {
-      HTTP_LOG(HTTP_LOGERR, "[http_server_listen] ready_clients() failed.\n");
+    if (conn_group_wait(conns, server->sockfd, &read) == HTTP_FAILURE) {
+      HTTP_LOG(HTTP_LOGERR, "[http_server_listen] conn_group_wait() failed.\n");
       goto fail; 
     }
     
     if (FD_ISSET(server->sockfd, &read)) {
-      struct sockaddr_in client_addr;
-      int addrlen = sizeof(client_addr);
-      SOCKET client_socket = accept(server->sockfd, (struct sockaddr*)&client_addr, &addrlen);
-      if (client_socket < 0) {
+      struct sockaddr_in conn_addr = { 0 };
+      int addrlen = sizeof(conn_addr);
+      SOCKET conn_socket = accept(server->sockfd, (struct sockaddr*)&conn_addr, &addrlen);
+      if (conn_socket < 0) {
         HTTP_LOG(HTTP_LOGERR, "[http_server_listen] accept() failed - %d.\n", GET_ERROR());
         goto fail; 
       }
-      struct client_info* client = add_client(clients, client_socket, &client_addr);
-      if (!client) {
-        HTTP_LOG(HTTP_LOGERR, "[http_server_listen] add_client() failed.\n");
+      struct conn_info* conn = conn_group_add(conns, conn_socket, &conn_addr);
+      if (!conn) {
+        HTTP_LOG(HTTP_LOGERR, "[http_server_listen] conn_group_add() failed.\n");
         goto fail;
       }
       HTTP_LOG(HTTP_LOGOUT, "accepted a client.\n");
 #ifdef HTTP_DEBUG
-      print_client_address(client);
+      print_addr(&conn->addr);
 #endif
     }
-	
-    const size_t cap = clients->cap;
+    
+    const size_t cap = conns->cap;
     for (size_t i = 0; i < cap; ++i) {
-      struct client_info* client = &clients->data[i];
-      if (client->used == 0) continue; 
-      if (client->request.state == STATE_GOT_ALL) {
-        if (http_send_response(client, &server->constraints) == HTTP_FAILURE) {
+      struct conn_info* conn = &conns->data[i];
+      if (conn->used == 0) continue; 
+      if (conn->request.state == STATE_GOT_ALL) {
+        if (http_send_response(conn, &server->constraints) == HTTP_FAILURE) {
           HTTP_LOG(HTTP_LOGERR, "[http_listen] http_send_response() failed.\n");
           goto fail;
         }
-        if (client->response.state == STATE_GOT_ALL) {
-            http_request_reset(&client->request, client->sockfd, &client->addr);
-            http_response_reset(&client->response);
-            client->buff_len = 0;
+        if (conn->response.state == STATE_GOT_ALL) {
+            http_request_reset(&conn->request, conn->sockfd, &conn->addr);
+            http_response_reset(&conn->response);
+            conn->buff_len = 0;
         }
       }
-      else if (FD_ISSET(client->sockfd, &read)) {
-        int res = recv(client->sockfd, client->buffer + client->buff_len, (int)(CLIENT_BUFFER_LEN - client->buff_len), 0);
+      else if (FD_ISSET(conn->sockfd, &read)) {
+        int res = recv(conn->sockfd, conn->buffer + conn->buff_len, (int)(CONN_BUFF_LEN - conn->buff_len), 0);
         if (res < 0) {
           HTTP_LOG(HTTP_LOGOUT, "client disconnected disgracefully.\n");
 #ifdef HTTP_DEBUG
-          print_client_address(client);
+          print_addr(&conn->addr);
 #endif
-          drop_client(client);
+          conn_info_drop(conn);
         }
         else if (res > 0) {
-          client->buff_len += res;
-          if (parse_request(client, &server->constraints) == HTTP_FAILURE)
-            server->error_handler(&client->request, &client->response); 
-          if (client->request.state == STATE_GOT_ALL)
-            server->request_handler(&client->request, &client->response);
+          conn->buff_len += res;
+          if (parse_request(conn, conn->buffer, &conn->buff_len, &server->constraints) == HTTP_FAILURE) {
+            server->error_handler(&conn->request, &conn->response);
+            if (http_validate_response(&conn->response) == HTTP_FAILURE) {
+              HTTP_LOG(HTTP_LOGERR, "[http_server_listen] http_validate_response() failed.\n");
+              goto fail;
+            }
+            conn->request.state = STATE_GOT_ALL; 
+          }
+          else if (conn->request.state == STATE_GOT_ALL) {
+            server->request_handler(&conn->request, &conn->response);
+            if (http_validate_response(&conn->response) == HTTP_FAILURE) {
+                HTTP_LOG(HTTP_LOGERR, "[http_server_listen] http_validate_response() failed.\n");
+                goto fail;
+            }
+          }
         }
         else {
           HTTP_LOG(HTTP_LOGOUT, "client disconnected gracefully.\n");
 #ifdef HTTP_DEBUG
-          print_client_address(client);
+          print_addr(&conn->addr);
 #endif
-          drop_client(client);
+          conn_info_drop(conn);
         }
       }
     }

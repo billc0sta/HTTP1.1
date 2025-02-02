@@ -72,7 +72,7 @@ typedef struct {
   int status;
   http_headers* headers;
   const unsigned char* body_string;
-  size_t string_len;
+  size_t body_len;
   FILE* body_file;
   int body_type;
 
@@ -84,6 +84,7 @@ typedef struct {
   size_t sent; 
   int send_key;
   http_constraints* constraints; 
+  int body_termination;
 } http_response;
 
 int http_response_make(http_response*, http_constraints*);

@@ -1,4 +1,4 @@
-#include "response_info.h" 
+#include "http_response.h" 
 
 struct status
 {
@@ -71,14 +71,14 @@ int http_response_make(http_response* res, http_constraints* constraints) {
     HTTP_LOG(HTTP_LOGERR, "[make_response_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  res->headers = make_headers();
+  res->headers = http_headers_make();
   if (!res->headers) {
     HTTP_LOG(HTTP_LOGERR, "[make_response_info] make_headers() failed.\n");
     return HTTP_FAILURE;
   }
   res->status        = HTTP_STATUS_NONE;
   res->body_string   = NULL;
-  res->string_len    = 0;
+  res->body_len      = 0;
   res->body_type     = BODYTYPE_NONE;
   res->state         = STATE_GOT_NOTHING;
   res->current_val   = NULL;
@@ -109,12 +109,12 @@ int http_response_set_body(http_response* res, const unsigned char* bytes, size_
     return HTTP_FAILURE;
   }
   res->body_string = bytes;
-  res->string_len  = len;
+  res->body_len    = len;
   res->body_type   = BODYTYPE_STRING;
   char size[20];
   sprintf(size, "%zu", len);
-  if (set_header(res->headers, "Content-Length", size) == HTTP_FAILURE ||
-      set_header(res->headers, "Content-Type", "text/plain") == HTTP_FAILURE) {
+  if (http_header_set(res->headers, "Content-Length", size) == HTTP_FAILURE ||
+      http_header_set(res->headers, "Content-Type", "text/plain") == HTTP_FAILURE) {
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_header] set_header() failed.\n");
     return HTTP_FAILURE;
   }
@@ -128,7 +128,7 @@ int http_response_set_body_file(http_response* res, char* file_name) {
   }
   char* dir;
   const char* public_folder = res->constraints->public_folder;
-  if (public_folder == "") {
+  if (*public_folder == 0) {
       dir = file_name;
   }
   else {
@@ -148,12 +148,12 @@ int http_response_set_body_file(http_response* res, char* file_name) {
   }
   if (dir != file_name) free(dir);
   res->body_type = BODYTYPE_FILE; 
-  if (set_header(res->headers, "Transfer-Encoding", "Chunked") == HTTP_FAILURE) {
+  if (http_header_set(res->headers, "Transfer-Encoding", "Chunked") == HTTP_FAILURE) {
       HTTP_LOG(HTTP_LOGERR, "[http_response_set_body_file] set_header() failed.\n");
       return HTTP_FAILURE;
   }
-  if (get_header(res->headers, "Content-Type") == NULL) {
-    if (set_header(res->headers, "Content-Type", "application/octet-stream") == HTTP_FAILURE) {
+  if (http_header_get(res->headers, "Content-Type") == NULL) {
+    if (http_header_set(res->headers, "Content-Type", "application/octet-stream") == HTTP_FAILURE) {
       HTTP_LOG(HTTP_LOGERR, "[http_response_set_body_file] set_header() failed.\n");
       return HTTP_FAILURE;
     }
@@ -166,7 +166,7 @@ int http_response_set_header(http_response* res, const char* name, const char* v
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_header] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  if (set_header(res->headers, name, value) == HTTP_FAILURE) {
+  if (http_header_set(res->headers, name, value) == HTTP_FAILURE) {
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_header] set_header() failed.\n");
     return HTTP_FAILURE;
   } 
@@ -194,10 +194,10 @@ int http_response_reset(http_response* res) {
     HTTP_LOG(HTTP_LOGERR, "[make_response_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  reset_headers(res->headers);
+  http_header_reset(res->headers);
   res->status = HTTP_STATUS_NONE;
   res->body_string = NULL;
-  res->string_len = 0;
+  res->body_len = 0;
   res->body_type = BODYTYPE_NONE;
   res->state = STATE_GOT_NOTHING;
   res->current_val = NULL;

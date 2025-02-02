@@ -1,13 +1,12 @@
-#include "request_parser.h"
-#include "client_info.h"
-#include "request_info.h"
+#include "parser.h"
+#include "conn_info.h"
+#include "http_request.h"
 
-int parse_request(struct client_info* client, http_constraints* constraints) {
-  http_request* req = &client->request;
+int parse_request(http_request* req, char* buffer, size_t *buff_len, http_constraints* constraints) {
   size_t len = 0;
-  char* q = client->buffer;
+  char* q = buffer;
   char* begin = q;
-  char* end = q + client->buff_len;
+  char* end = q + *buff_len;
   *end = 0;
   
   while (q < end && strstr(q, "\r\n")) {
@@ -87,7 +86,7 @@ int parse_request(struct client_info* client, http_constraints* constraints) {
         if (req->headers->len == constraints->request_max_headers)
           return HTTP_FAILURE;
 
-        size_t len = 0;
+        len = 0;
         begin = q;
         q = strchr(q, ':');
         if (!q)
@@ -162,8 +161,8 @@ int parse_request(struct client_info* client, http_constraints* constraints) {
     }
   }
   
-  client->buff_len = MAX(0, client->buff_len - (q - client->buffer));
-  if (client->buff_len > 0)
-    memcpy(client->buffer, q, client->buff_len);
+  *buff_len = MAX(0, *buff_len - (q - buffer));
+  if (*buff_len > 0)
+    memcpy(buffer, q, *buff_len);
   return HTTP_SUCCESS;
 }

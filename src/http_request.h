@@ -16,12 +16,6 @@ enum {
   METHOD_NONE
 };
 
-enum {
-  BODYTERMI_LENGTH,
-  BODYTERMI_CHUNKED,
-  BODYTERMI_NONE
-};
-
 typedef struct {
   char   method;
   char   version;
@@ -33,8 +27,8 @@ typedef struct {
 
   // internal use 
   char state;
-  SOCKET client_socket;
-  struct sockaddr_in client_address;
+  SOCKET conn_socket;
+  struct sockaddr_in conn_address;
   int body_termination;
   size_t length;
   size_t chunk; 
