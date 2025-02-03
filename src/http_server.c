@@ -41,7 +41,11 @@ http_server* http_server_new(const char* ip, const char* port, request_handler r
   hints.ai_family   = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags    = AI_PASSIVE;
-  getaddrinfo(ip, port, &hints, &binder);
+  int res = getaddrinfo(ip, port, &hints, &binder);
+  if (res) {
+    HTTP_LOG(HTTP_LOGERR, "[http_server_new] getaddrinfo failed - %d.\n", res);
+    return NULL;
+  }
   
   http_server* server = malloc(sizeof(http_server));
   if (!server) {
@@ -56,7 +60,7 @@ http_server* http_server_new(const char* ip, const char* port, request_handler r
   server->request_handler = request_handler;
   server->error_handler   = http_default_error_handler; 
   server->addr            = *(struct sockaddr_in*)binder->ai_addr;
-  server->constraints     = constraints ? *constraints : http_make_default_constraints();
+  server->constraints     = constraints ? *constraints : http_constraints_make_default();
   server->conns           = conn_group_make(&server->constraints); 
   freeaddrinfo(binder);
   return server;
@@ -360,17 +364,3 @@ int http_server_set_error_handler(http_server* server, request_handler error_han
   server->error_handler = error_handler; 
   return HTTP_SUCCESS; 
 }
-
-http_constraints http_make_default_constraints() {
-  http_constraints constraints = {
-    .request_max_body_len = 1024 * 1024 * 2,    /* 2MB                */
-    .request_max_uri_len  = 2048,               /* 2KB: standard spec */
-    .request_max_headers  = 24,                 /* arbitrary          */
-    .request_max_header_len = 1024 * 1024 * 8,  /* 8MB                */
-    .recv_len = 1024 * 1024,                    /* 1MB                */
-    .send_len = 1024 * 1024,                    /* 1MB                */
-    .public_folder = ""
-  };
-  return constraints;
-}
-

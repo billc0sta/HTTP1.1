@@ -9,6 +9,17 @@ struct conn_group conn_group_make(http_constraints* constraints) {
   return conns;
 }
 
+struct conn_info* conn_info_new(http_constraints* constraints) {
+  struct conn_info* conn = malloc(sizeof(struct conn_info));
+  if (!conn) {
+    HTTP_LOG(HTTP_LOGERR, "[conn_info_new] malloc() failed.\n");
+    return NULL;
+  }
+  memset(conn, 0, sizeof(conn));
+  conn_info_reset(conn, constraints);
+  return conn;
+}
+
 int conn_info_reset(struct conn_info* conn, http_constraints* constraints) {
   if (!conn) {
     HTTP_LOG(HTTP_LOGERR, "[reset_conn_info] passed NULL pointers for mandatory parameters.\n");
@@ -19,22 +30,22 @@ int conn_info_reset(struct conn_info* conn, http_constraints* constraints) {
   conn->buff_len = 0;
   conn->used = 0;
   if (conn->request.headers) {
-      http_request_reset(&conn->request, conn->sockfd, &conn->addr);
+    http_request_reset(&conn->request, conn->sockfd, &conn->addr);
   }
   else {
-      if (http_request_make(&conn->request, conn->sockfd, &conn->addr, constraints) == HTTP_FAILURE) {
-          HTTP_LOG(HTTP_LOGERR, "[reset_conn_info] http_request_make failed.\n");
-          return HTTP_FAILURE;
-      }
+    if (http_request_make(&conn->request, conn->sockfd, &conn->addr, constraints) == HTTP_FAILURE) {
+      HTTP_LOG(HTTP_LOGERR, "[reset_conn_info] http_request_make failed.\n");
+      return HTTP_FAILURE;
+    }
   }
   if (conn->response.headers) {
-      http_response_reset(&conn->response);
+    http_response_reset(&conn->response);
   }
   else {
-      if (http_response_make(&conn->response, constraints) == HTTP_FAILURE) {
-          HTTP_LOG(HTTP_LOGERR, "[reset_conn_info] http_response_make failed.\n");
-          return HTTP_FAILURE;
-      }
+    if (http_response_make(&conn->response, constraints) == HTTP_FAILURE) {
+      HTTP_LOG(HTTP_LOGERR, "[reset_conn_info] http_response_make failed.\n");
+      return HTTP_FAILURE;
+    }
   }
   return HTTP_SUCCESS;
 }
@@ -113,13 +124,29 @@ int conn_info_drop(struct conn_info* conn) {
   return HTTP_SUCCESS;
 }
 
-int free_conn_info(struct conn_info* conn) {
+int _conn_info_free(struct conn_info* conn) {
+  if (conn->request.headers) {
+    if (http_request_free(&conn->request) == HTTP_FAILURE) {
+      HTTP_LOG(HTTP_LOGERR, "[conn_info_free] http_request_free() failed.\n");
+      return HTTP_FAILURE;
+    }
+  }
+  if (conn->response.headers) {
+    if (http_response_free(&conn->response) == HTTP_FAILURE) {
+      HTTP_LOG(HTTP_LOGERR, "[conn_info_free] http_response_free() failed.\n");
+      return HTTP_FAILURE;
+    }
+  }
+  return HTTP_SUCCESS;
+}
+
+int conn_info_free(struct conn_info* conn) {
   if (!conn) {
     HTTP_LOG(HTTP_LOGERR, "[free_conn_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  if (conn->request.headers)
-    http_request_free(&conn->request);
+  _conn_info_free(conn);
+  free(conn);
   return HTTP_SUCCESS; 
 }
 
@@ -130,7 +157,7 @@ int conn_group_free(struct conn_group* conns) {
   }
   size_t cap = conns->cap;
   for (size_t i = 0; i < cap; ++i) {
-    free_conn_info(&conns->data[i]);
+    _conn_info_free(&conns->data[i]);
   }
   free(conns->data);
   conns->cap = 0;

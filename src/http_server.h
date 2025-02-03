@@ -1,5 +1,5 @@
-#ifndef HTTP_H_
-#define HTTP_H_ 
+#ifndef HTTP_SERVER_H_
+#define HTTP_SERVER_H_ 
 #include "includes.h"
 #include "conn_info.h" 
 #include "http_request.h"
@@ -25,10 +25,5 @@ int http_server_free(http_server*);
 int http_server_set_error_handler(http_server*, request_handler);
 int http_server_listen(http_server*);
 http_constraints http_make_default_constraints();
-
-/*
-  I will write some usage notes here:
-  - anything that isn't prefixed with `http` is not meant for the user
-*/
 
 #endif 

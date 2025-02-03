@@ -1,5 +1,3 @@
-#ifndef HASHMAP_H_
-#define HASHMAP_H_
 #include "http_headers.h"
 #define LOAD_FACTOR_MAX 0.6
 #define LOAD_FACTOR_MIN 0.1
@@ -129,7 +127,7 @@ static int http_headers_resize(http_headers* map, size_t resize_by)
   return HTTP_SUCCESS;
 }
 
-int http_header_set(http_headers* map, const char* key, const char* val) {
+int http_headers_set(http_headers* map, const char* key, const char* val) {
   if (!map || !key || !val) {
     HTTP_LOG(HTTP_LOGERR, "[set_header] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
@@ -211,7 +209,7 @@ int http_header_set(http_headers* map, const char* key, const char* val) {
   return HTTP_SUCCESS; 
 }
 
-http_hdv* http_header_get(http_headers* map, const char* key)
+http_hdv* http_headers_get(http_headers* map, const char* key)
 {
   if (!map || !key) {
     HTTP_LOG(HTTP_LOGERR, "[get_header] passed NULL pointers for mandatory parameters.\n");
@@ -224,7 +222,7 @@ http_hdv* http_header_get(http_headers* map, const char* key)
   return NULL;
 }
 
-int http_header_remove(http_headers* map, const char* key)
+int http_headers_remove(http_headers* map, const char* key)
 {
   if (!map || key) {
     HTTP_LOG(HTTP_LOGERR, "[remove_header] passed NULL pointers for mandatory parameters.\n");
@@ -248,7 +246,7 @@ int http_header_remove(http_headers* map, const char* key)
   return HTTP_SUCCESS;
 }
 
-int http_header_next(http_headers* map, size_t* iter, http_hdk* key, http_hdv** val)
+int http_headers_next(http_headers* map, size_t* iter, http_hdk* key, http_hdv** val)
 {
   if (!map || !iter || !key || !val) {
     HTTP_LOG(HTTP_LOGERR, "[next_header] passed NULL pointers for mandatory parameters.\n");
@@ -268,7 +266,7 @@ int http_header_next(http_headers* map, size_t* iter, http_hdk* key, http_hdv** 
   return HTTP_FAILURE;
 }
 
-int http_header_reset(http_headers* map)
+int http_headers_reset(http_headers* map)
 {
   if (!map) {
     HTTP_LOG(HTTP_LOGERR, "[reset_headers] passed NULL pointers for mandatory parameters.\n");
@@ -283,14 +281,13 @@ int http_header_reset(http_headers* map)
   return HTTP_SUCCESS;
 }
 
-int http_header_free(http_headers* map) {
+int http_headers_free(http_headers* map) {
   if (!map) {
     HTTP_LOG(HTTP_LOGERR, "[free_headers] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  http_header_reset(map);
+  http_headers_reset(map);
   free(map->buckets);
   free(map);
   return HTTP_SUCCESS;
 }
-#endif

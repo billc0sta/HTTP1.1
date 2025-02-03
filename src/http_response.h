@@ -1,5 +1,5 @@
-#ifndef RESPONSE_INFO_H_
-#define RESPONSE_INFO_H_
+#ifndef HTTP_RESPONSE_H_
+#define HTTP_RESPONSE_H_
 #include "includes.h" 
 
 enum {
@@ -95,4 +95,5 @@ int http_response_set_header(http_response*, const char*, const char*);
 const char* http_response_status_string(int);
 int http_response_status_code(int);
 int http_response_reset(http_response*);
+int http_response_free(http_response*);
 #endif

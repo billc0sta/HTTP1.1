@@ -1,5 +1,5 @@
-#ifndef CLIENT_INFO_H_
-#define CLIENT_INFO_H_
+#ifndef CONN_INFO_H_
+#define CONN_INFO_H_
 #include "includes.h" 
 #include "http_request.h"
 #include "http_response.h"
@@ -26,6 +26,8 @@ struct conn_group {
 struct conn_info* conn_group_add(struct conn_group*, SOCKET, struct sockaddr_in* s);
 int conn_info_drop(struct conn_info*);
 struct conn_group conn_group_make(http_constraints*);
+struct conn_info* conn_info_new(http_constraints*);
+int conn_info_free(struct conn_info*);
 int conn_group_free(struct conn_group*);
 int conn_group_wait(struct conn_group*, SOCKET, fd_set*);
 int conn_info_reset(struct conn_info*, http_constraints*);

@@ -1,5 +1,5 @@
-#ifndef INCLUDES_H_
-#define INCLUDES_H_
+#ifndef HTTP_INCLUDES_H_
+#define HTTP_INCLUDES_H_
 #define _WIN32_WINNT 0x501
 
 #include <stdlib.h>
@@ -46,22 +46,8 @@ enum {
 #define HTTP_DEBUG 
 #endif
 #ifdef HTTP_DEBUG
-
-static int print_addr(struct sockaddr_in* addr) {
-	char address[100];
-	getnameinfo((struct sockaddr*)addr, sizeof(addr), address, 100, NULL, 0, NI_NUMERICHOST);
-	printf("the client's address: %s\n", address);
-	return HTTP_SUCCESS;
-}
-
-static int HTTP_LOG(FILE* file, const char* format, ...) {
-  va_list args;
-  va_start(args, format);
-  int res = vfprintf(file, format, args);
-  va_end(args);
-  return res; 
-}
-
+static int HTTP_LOG(FILE*, const char*, ...);
+int print_addr(struct sockaddr_in*);
 #ifndef HTTP_LOGOUT 
 #define HTTP_LOGOUT stdout
 #endif
@@ -83,6 +69,8 @@ typedef struct {
   size_t send_len;
   const char* public_folder; 
 } http_constraints;
+
+http_constraints http_constraints_make_default();
 
 enum {
   STATE_GOT_NOTHING,

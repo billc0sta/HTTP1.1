@@ -21,7 +21,7 @@ int http_request_make(http_request* req, SOCKET conn_socket, struct sockaddr_in 
   req->body = malloc(constraints->request_max_body_len + 1);
   if (!req->body) {
     free(req->uri);
-    http_header_free(req->headers);
+    http_headers_free(req->headers);
     HTTP_LOG(HTTP_LOGERR, "[make_request_info] malloc() failed.\n");
     return HTTP_FAILURE;
   }
@@ -45,7 +45,7 @@ int http_request_free(http_request* req) {
   }
   free(req->uri);
   free(req->body);
-  http_header_free(req->headers); 
+  http_headers_free(req->headers); 
   return HTTP_SUCCESS; 
 }
 
@@ -54,7 +54,7 @@ int http_request_reset(http_request* req, SOCKET conn_socket, struct sockaddr_in
     HTTP_LOG(HTTP_LOGERR, "[reset_request_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  http_header_reset(req->headers);
+  http_headers_reset(req->headers);
   req->state    = STATE_GOT_NOTHING;
   req->method   = METHOD_NONE;
   req->version  = HTTP_VERSION_NONE;
@@ -73,6 +73,6 @@ int http_request_add_header(http_request* req, const char* header, const char* v
     HTTP_LOG(HTTP_LOGERR, "[add_header_request_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  http_header_set(req->headers, header, value);
+  http_headers_set(req->headers, header, value);
   return HTTP_SUCCESS;
 }

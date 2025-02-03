@@ -1,5 +1,5 @@
-#ifndef REQUEST_INFO_H_
-#define REQUEST_INFO_H_
+#ifndef HTTP_REQUEST_H_
+#define HTTP_REQUEST_H_
 
 #include "includes.h"
 

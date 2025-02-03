@@ -89,6 +89,14 @@ int http_response_make(http_response* res, http_constraints* constraints) {
   return HTTP_SUCCESS; 
 }
 
+int http_response_free(http_response* response) {
+  if (!response) {
+    HTTP_LOG(HTTP_LOGERR, "[http_response_free] passed NULL pointers for mandatory parameters.\n");
+    return HTTP_FAILURE;
+  }
+  http_header_free(response->headers);
+}
+
 int http_response_set_status(http_response* res, int status) {
   if (!res) {
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_status] passed NULL pointers for mandatory parameters.\n");
