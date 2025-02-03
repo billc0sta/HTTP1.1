@@ -42,7 +42,9 @@ enum {
 #define SOCKET_ERROR -1
 #endif
 
+#if defined(_DEBUG) || defined(DEBUG)
 #define HTTP_DEBUG 
+#endif
 #ifdef HTTP_DEBUG
 
 static int print_addr(struct sockaddr_in* addr) {

@@ -99,7 +99,7 @@ int http_send_response(struct conn_info* conn, http_constraints* constraints) {
         return HTTP_FAILURE; 
       } 
       res->state = STATE_GOT_LINE;
-      if (http_header_next(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE)
+      if (http_headers_next(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE)
         res->state = STATE_GOT_HEADERS;
       sent += ret;
     }
@@ -135,7 +135,7 @@ int http_send_response(struct conn_info* conn, http_constraints* constraints) {
           if (val->next)
             res->current_val = val->next; 
           else {
-            if (http_header_next(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE) {
+            if (http_headers_next(res->headers, &res->headers_iter, &res->current_key, &res->current_val) == HTTP_FAILURE) {
               if ((ret = send(sockfd, "\r\n", 2, 0)) == SOCKET_ERROR) {
                 HTTP_LOG(HTTP_LOGERR, "[http_send_response] send() failed - %d.\n", GET_ERROR());
                 return HTTP_FAILURE;
@@ -215,8 +215,8 @@ int http_validate_response(http_response* res) {
   }
 
   http_headers* headers = res->headers;
-  http_hdv* length = http_header_get(headers, "Content-Length");
-  http_hdv* tren = http_header_get(headers, "Transfer-Encoding");
+  http_hdv* length = http_headers_get(headers, "Content-Length");
+  http_hdv* tren = http_headers_get(headers, "Transfer-Encoding");
   if (length) {
     if (tren) {
       HTTP_LOG(HTTP_LOGERR, "[http_validate_response] invalid headers - both 'Content-Length' and 'Transfer-Encoding' are set.\n");

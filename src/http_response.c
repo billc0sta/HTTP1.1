@@ -113,8 +113,8 @@ int http_response_set_body(http_response* res, const unsigned char* bytes, size_
   res->body_type   = BODYTYPE_STRING;
   char size[20];
   sprintf(size, "%zu", len);
-  if (http_header_set(res->headers, "Content-Length", size) == HTTP_FAILURE ||
-      http_header_set(res->headers, "Content-Type", "text/plain") == HTTP_FAILURE) {
+  if (http_headers_set(res->headers, "Content-Length", size) == HTTP_FAILURE ||
+      http_headers_set(res->headers, "Content-Type", "text/plain") == HTTP_FAILURE) {
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_header] set_header() failed.\n");
     return HTTP_FAILURE;
   }
@@ -148,12 +148,12 @@ int http_response_set_body_file(http_response* res, char* file_name) {
   }
   if (dir != file_name) free(dir);
   res->body_type = BODYTYPE_FILE; 
-  if (http_header_set(res->headers, "Transfer-Encoding", "Chunked") == HTTP_FAILURE) {
+  if (http_headers_set(res->headers, "Transfer-Encoding", "Chunked") == HTTP_FAILURE) {
       HTTP_LOG(HTTP_LOGERR, "[http_response_set_body_file] set_header() failed.\n");
       return HTTP_FAILURE;
   }
-  if (http_header_get(res->headers, "Content-Type") == NULL) {
-    if (http_header_set(res->headers, "Content-Type", "application/octet-stream") == HTTP_FAILURE) {
+  if (http_headers_get(res->headers, "Content-Type") == NULL) {
+    if (http_headers_set(res->headers, "Content-Type", "application/octet-stream") == HTTP_FAILURE) {
       HTTP_LOG(HTTP_LOGERR, "[http_response_set_body_file] set_header() failed.\n");
       return HTTP_FAILURE;
     }
@@ -166,7 +166,7 @@ int http_response_set_header(http_response* res, const char* name, const char* v
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_header] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  if (http_header_set(res->headers, name, value) == HTTP_FAILURE) {
+  if (http_headers_set(res->headers, name, value) == HTTP_FAILURE) {
     HTTP_LOG(HTTP_LOGERR, "[http_response_set_header] set_header() failed.\n");
     return HTTP_FAILURE;
   } 
@@ -194,7 +194,7 @@ int http_response_reset(http_response* res) {
     HTTP_LOG(HTTP_LOGERR, "[make_response_info] passed NULL pointers for mandatory parameters.\n");
     return HTTP_FAILURE;
   }
-  http_header_reset(res->headers);
+  http_headers_reset(res->headers);
   res->status = HTTP_STATUS_NONE;
   res->body_string = NULL;
   res->body_len = 0;

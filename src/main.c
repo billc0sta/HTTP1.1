@@ -8,7 +8,7 @@ static int dump_headers(http_headers* headers) {
   size_t iter = 0;
   http_hdv* values;
   http_hdk  name;
-  while (http_header_next(headers, &iter, &name, &values) == 0) {
+  while (http_headers_next(headers, &iter, &name, &values) == 0) {
     for (http_hdv* curr = values; curr; curr = curr->next) {
       printf("-- {%s:%s}\n", name.v, curr->v);
     }
@@ -26,7 +26,7 @@ int main() {
     return 1;
   }
   
-  http_server* server = http_server_new("0.0.0.0", "7432", handler, NULL);
+  http_server* server = http_server_new("0.0.0.0", "8080", handler, NULL);
   if (server) {
     http_server_listen(server); 
     http_server_free(server);
